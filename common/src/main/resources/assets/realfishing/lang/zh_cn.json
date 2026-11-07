@@ -1,5 +1,13 @@
 {
   "item.realfishing.float_rod": "台钓竿",
+  "item.realfishing.raw_trout": "生虹鳟",
+  "item.realfishing.raw_carp": "生鲫鱼",
+  "item.realfishing.raw_bass": "生海鲈",
+  "item.realfishing.raw_catfish": "生鲶鱼",
+  "item.realfishing.raw_eel": "生鳗鱼",
+  "item.realfishing.bait_worm": "蚯蚓饵",
+  "item.realfishing.bait_insect": "昆虫饵",
+  "itemGroup.realfishing": "写实钓鱼",
   "key.realfishing.category": "写实钓鱼",
   "key.realfishing.drag_up": "增大泄力",
   "key.realfishing.drag_down": "减小泄力"

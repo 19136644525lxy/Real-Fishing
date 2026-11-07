@@ -4,20 +4,25 @@ import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.networking.NetworkManager;
 import dev.realfishing.RealFishing;
+import dev.realfishing.data.FishEntry;
+import dev.realfishing.data.FishTable;
 import dev.realfishing.data.FishingSavedData;
 import dev.realfishing.entity.BobberEntity;
 import dev.realfishing.item.FloatRodItem;
 import dev.realfishing.net.SessionS2C;
 import dev.realfishing.registry.ModEntities;
+import dev.realfishing.registry.ModSounds;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -152,6 +157,7 @@ public final class FishingManager {
         session.lineLength = 0.0;
         session.transition(FishingState.CASTING, now);
         data.markDirty();
+        player.serverLevel().playSound(null, player.blockPosition(), ModSounds.CAST.get(), player.getSoundSource(), 1.0F, 1.4F);
         RealFishing.LOGGER.info("[M1] cast accepted: player={} charge={} speed={}",
                 player.getGameProfile().getName(), charge, CastMath.speed(charge));
     }
@@ -194,8 +200,12 @@ public final class FishingManager {
 
     private static void startFight(ServerPlayer player, FishingSession session) {
         long now = gameTime(player.server);
-        int tier = pickTier();
-        FightModel fight = FightModel.ofTier(tier, player.getUUID().getLeastSignificantBits() ^ now);
+        FishEntry fish = fishEntry(session);
+        int tier = fish == null ? pickTier() : tierOf(fish);
+        long seed = player.getUUID().getLeastSignificantBits() ^ now;
+        FightModel fight = fish == null
+                ? FightModel.ofTier(tier, seed)
+                : FightModel.ofFish(fish.strength(), fish.staminaSeconds(), fish.turnRate(), seed);
         fight.setLineLength(Math.max(FightModel.MIN_LINE, session.lineLength));
         FIGHTS.put(player.getUUID(), fight);
         session.fishTier = tier;
@@ -205,8 +215,41 @@ public final class FishingManager {
         session.drag = 0.2;
         session.transition(FishingState.FIGHTING, now);
         sync(player, session);
-        RealFishing.LOGGER.info("[M3] fight start: player={} tier={} line={}",
-                player.getGameProfile().getName(), tier, String.format("%.2f", session.lineLength));
+        RealFishing.LOGGER.info("[M3] fight start: player={} fish={} tier={} line={}",
+                player.getGameProfile().getName(), session.fishId, tier,
+                String.format("%.2f", session.lineLength));
+    }
+
+    /** 咬钩时选鱼：环境 + 竿型 + 饵系数，SPEC §13.2。 */
+    private static FishEntry pickFish(ServerPlayer player, FishingSession session, BobberEntity bobber, long now) {
+        ServerLevel level = player.serverLevel();
+        long seed = now ^ player.getUUID().getLeastSignificantBits() ^ bobber.blockPosition().asLong();
+        return FishTable.pick(level, bobber.blockPosition(), session.rodStyle, bait(player),
+                RandomSource.create(seed), level.getDayTime()).orElse(null);
+    }
+
+    private static FishEntry fishEntry(FishingSession session) {
+        if (session.fishId == null || session.fishId.isEmpty()) {
+            return null;
+        }
+        ResourceLocation id = ResourceLocation.tryParse(session.fishId);
+        return id == null ? null : FishTable.byId(id).orElse(null);
+    }
+
+    /** 鱼档只用于 HUD 的粗略提示；真实手感来自鱼表的 strength/stamina/turn_rate。 */
+    private static int tierOf(FishEntry fish) {
+        if (fish.strength() < 0.4F) {
+            return FightModel.TIER_SMALL;
+        }
+        if (fish.strength() < 0.6F) {
+            return FightModel.TIER_MEDIUM;
+        }
+        return FightModel.TIER_BIG;
+    }
+
+    /** 饵放在副手；没有副手物品就是空钩。 */
+    private static ItemStack bait(ServerPlayer player) {
+        return player.getOffhandItem();
     }
 
     private static int pickTier() {
@@ -285,9 +328,20 @@ public final class FishingManager {
                     return;
                 }
                 if (now >= NEXT_BITE.getOrDefault(id, now + BITE_MIN_TICKS)) {
-                    session.transition(FishingState.BITE, now);
-                    bobber.splash();
-                    sync(player, session);
+                    FishEntry fish = pickFish(player, session, bobber, now);
+                    if (fish == null) {
+                        // 没有候选鱼（群系/时段/水深/饵都不匹配）：空钩，重掷计时。
+                        NEXT_BITE.put(id, now + BITE_MIN_TICKS + RANDOM.nextInt(BITE_MAX_TICKS - BITE_MIN_TICKS));
+                    } else {
+                        session.fishId = fish.id().toString();
+                        session.transition(FishingState.BITE, now);
+                        bobber.splash();
+                        player.serverLevel().playSound(null, bobber.blockPosition(), ModSounds.BITE.get(),
+                                player.getSoundSource(), 1.0F, 1.0F);
+                        sync(player, session);
+                        RealFishing.LOGGER.info("[M4] bite: player={} fish={}",
+                                player.getGameProfile().getName(), fish.id());
+                    }
                 }
             }
             case BITE -> {
@@ -381,6 +435,7 @@ public final class FishingManager {
                     ? level.getEntity(session.bobberEntityId).position()
                     : player.position();
             level.playSound(null, BlockPos.containing(at), SoundEvents.ITEM_BREAK, player.getSoundSource(), 1.0F, 0.8F);
+            level.playSound(null, BlockPos.containing(at), ModSounds.SNAP.get(), player.getSoundSource(), 1.0F, 1.0F);
             level.sendParticles(ParticleTypes.SPLASH, at.x, at.y, at.z, 16, 0.3, 0.3, 0.3, 0.05);
             RealFishing.LOGGER.info("[M3] line snapped: player={} tension={}",
                     player.getGameProfile().getName(), String.format("%.2f", session.tension));
@@ -393,17 +448,36 @@ public final class FishingManager {
     }
 
     private static void award(ServerPlayer player, FishingSession session) {
-        ItemStack loot = switch (session.fishTier) {
-            case FightModel.TIER_SMALL -> new ItemStack(Items.COD);
-            case FightModel.TIER_BIG -> new ItemStack(Items.COD, 3);
-            default -> new ItemStack(Items.SALMON);
-        };
-        if (!player.getInventory().add(loot)) {
-            player.drop(loot, false);
+        FishEntry fish = fishEntry(session);
+        if (fish == null) {
+            // 没有鱼表数据（旧存档/调试），退回按档位给原版鱼，保证不会空手。
+            ItemStack fallback = switch (session.fishTier) {
+                case FightModel.TIER_SMALL -> new ItemStack(Items.COD);
+                case FightModel.TIER_BIG -> new ItemStack(Items.COD, 3);
+                default -> new ItemStack(Items.SALMON);
+            };
+            give(player, fallback);
+            player.giveExperiencePoints(1 + RANDOM.nextInt(6));
+            return;
         }
-        player.giveExperiencePoints(1 + RANDOM.nextInt(6));
-        RealFishing.LOGGER.info("[M3] landed fish: player={} tier={}",
-                player.getGameProfile().getName(), session.fishTier);
+        RandomSource random = RandomSource.create(player.serverLevel().getRandom().nextLong());
+        FishEntry.addLoot(fish, random, stack -> give(player, stack));
+        int xp = fish.minXp() + random.nextInt(Math.max(1, fish.maxXp() - fish.minXp() + 1));
+        player.giveExperiencePoints(xp);
+        player.serverLevel().playSound(null, player.blockPosition(), ModSounds.CATCH.get(), player.getSoundSource(), 1.0F, 1.2F);
+        // 用掉的饵：只在咬钩时匹配到的饵才消耗，避免"空钩也吃饵"。
+        ItemStack bait = bait(player);
+        if (!bait.isEmpty() && fish.baitMultiplier(bait) > 0.5F) {
+            bait.shrink(1);
+        }
+        RealFishing.LOGGER.info("[M4] landed fish: player={} fish={} xp={}",
+                player.getGameProfile().getName(), fish.id(), xp);
+    }
+
+    private static void give(ServerPlayer player, ItemStack stack) {
+        if (!player.getInventory().add(stack)) {
+            player.drop(stack, false);
+        }
     }
 
     private static void sync(ServerPlayer player, FishingSession session) {

@@ -1,5 +1,13 @@
 {
   "item.realfishing.float_rod": "Float Rod",
+  "item.realfishing.raw_trout": "Raw Trout",
+  "item.realfishing.raw_carp": "Raw Carp",
+  "item.realfishing.raw_bass": "Raw Bass",
+  "item.realfishing.raw_catfish": "Raw Catfish",
+  "item.realfishing.raw_eel": "Raw Eel",
+  "item.realfishing.bait_worm": "Worm Bait",
+  "item.realfishing.bait_insect": "Insect Bait",
+  "itemGroup.realfishing": "Real Fishing",
   "key.realfishing.category": "Real Fishing",
   "key.realfishing.drag_up": "Increase Drag",
   "key.realfishing.drag_down": "Decrease Drag"

@@ -1,0 +1,20 @@
+{
+  "display_name": "鲭鱼",
+  "strength": 0.4,
+  "stamina_seconds": 10,
+  "turn_rate": 0.8,
+  "weight": 80,
+  "conditions": {
+    "biomes": ["#realfishing:is_ocean"],
+    "time": ["day"],
+    "weather": ["rain", "thunder"],
+    "min_water_depth": 6,
+    "max_water_depth": 32,
+    "bait": ["#realfishing:bait_worm", "#realfishing:bait_insect"]
+  },
+  "loot": [
+    { "item": "realfishing:raw_bass", "count": [1, 2], "chance": 0.9 }
+  ],
+  "xp": [2, 5],
+  "rod_styles": ["float"]
+}

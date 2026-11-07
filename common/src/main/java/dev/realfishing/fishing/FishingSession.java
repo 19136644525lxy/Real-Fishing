@@ -19,8 +19,10 @@ public final class FishingSession {
     public double drag;
     public double tension;
     public double fishStamina;
-    /** 当前搏鱼对象档位（0 小 / 1 中 / 2 大），M4 换成具体鱼 id。 */
+    /** 当前搏鱼对象档位（0 小 / 1 中 / 2 大）；M4 起仅作调试回退。 */
     public int fishTier;
+    /** 咬钩时选中的鱼 id（ealfishing:rainbow_trout），空串表示还没选鱼。 */
+    public String fishId = "";
     /** 玩家这一 tick 是否按住收线（不落盘）。 */
     public boolean reeling;
     public RodStyle rodStyle = RodStyle.FLOAT;
@@ -51,6 +53,7 @@ public final class FishingSession {
         tension = 0.0;
         fishStamina = 0.0;
         fishTier = 0;
+        fishId = "";
         reeling = false;
         bobberEntityId = -1;
         castGameTime = 0L;
@@ -67,6 +70,7 @@ public final class FishingSession {
         tag.putDouble("tension", tension);
         tag.putDouble("fishStamina", fishStamina);
         tag.putInt("fishTier", fishTier);
+        tag.putString("fishId", fishId);
         tag.putString("rodStyle", rodStyle.name());
         tag.putLong("stateSince", stateSince);
         tag.putInt("bobber", bobberEntityId);
@@ -85,6 +89,7 @@ public final class FishingSession {
         s.tension = tag.getDouble("tension");
         s.fishStamina = tag.getDouble("fishStamina");
         s.fishTier = tag.getInt("fishTier");
+        s.fishId = tag.getString("fishId");
         try {
             s.rodStyle = RodStyle.valueOf(tag.getString("rodStyle"));
         } catch (IllegalArgumentException ignored) {

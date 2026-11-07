@@ -1,6 +1,7 @@
 package dev.realfishing.entity;
 
 import dev.realfishing.fishing.CastMath;
+import dev.realfishing.registry.ModSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -141,6 +142,8 @@ public class BobberEntity extends Entity {
             } else {
                 level().playSound(null, getX(), getY(), getZ(),
                         SoundEvents.GENERIC_SPLASH, SoundSource.NEUTRAL, 0.6F, 1.2F);
+                level().playSound(null, getX(), getY(), getZ(),
+                        ModSounds.LAND.get(), SoundSource.NEUTRAL, 0.5F, 1.3F);
             }
         } else if (level().isClientSide) {
             for (int i = 0; i < 4; i++) {

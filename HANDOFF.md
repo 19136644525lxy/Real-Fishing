@@ -7,10 +7,10 @@
 
 ## 1. 一句话现状
 
-**M0 骨架 + M1 抛投 + M2 鱼线 + M3 搏鱼已完成**，双端实测：蓄力→抛投→入水→浮漂/鱼线渲染→咬钩→张力条/体力条→收线→上鱼入包（salmon×1）/断线。下一步 M4 内容（鱼表/战利品/音效/配方）。
+**M0–M4 已完成**，双端实测：蓄力→抛投→入水→浮漂/鱼线渲染→咬钩（按鱼表选鱼，实测 `pike`）→张力条/体力条→收线→上鱼入包（`raw_trout×1`）/断线。下一步 M5 手感（3D 竿模型、甩竿动画、相机）。
 
 - 目标：Minecraft 1.20.1 写实钓鱼模组，Fabric + Forge 双端，Architectury 三层，纯 Java 物理。
-- 进度：M0、M1、M2 已勾选完成（`ROADMAP.md`）；M3–M6（v0.1 台钓竿）待开工；M9（v0.2 路亚竿）只有规格。
+- 进度：M0、M1、M2、M3、M4 已勾选完成（`ROADMAP.md`）；M5–M6（v0.1 台钓竿）待开工；M9（v0.2 路亚竿）只有规格。
 - 已冻结的决策、参数、协议、里程碑全部写在 SPEC，**不要重新讨论，直接照做**。
 - 构建/验证命令见 AGENTS §3；`GRADLE_USER_HOME=F:\.gradlecache`，JDK 17。
 
@@ -35,12 +35,12 @@
 | `gradle.properties` | 版本锁定（SPEC §7.1）：MC 1.20.1 / Architectury 9.2.14 / Loom 1.7.417 / Forge 47.3.33 | ✅ |
 | `settings.gradle` / `build.gradle` | 三模块工程 + 统一 toolchain 17 / JUnit 5 | ✅ |
 | `gradlew` / `gradle/wrapper` | Gradle 8.8 wrapper（`validateDistributionUrl=false`） | ✅ |
-| `common/` | 玩法/物理/数据层（无平台 import）：`RealFishing`、`IPlatform`、`ModItems`、`ModEntities`、`RodItem`、`FloatRodItem`、`BobberEntity`、`RealFishingCommands`；M1 新增 `fishing/`（`FishingState`/`FishingSession`/`CastMath`/`FishingManager`）、`data/FishingSavedData`、`net/CastC2S`、`client/`（`BobberRenderer`/`FishingHud`/`ClientCast`/`ClientSetup`/`DebugAutoCast`）；M2 新增 `physics/FishingLine`、`client/ClientLineSim`、`client/ClientLineRenderer`；M3 新增 `fishing/FightModel`、`net/{ReelC2S,PumpC2S,DragC2S,SessionS2C}`、`client/ClientFight`（张力/体力 HUD 在 `FishingHud`） | ✅ M0–M3 |
+| `common/` | 玩法/物理/数据层（无平台 import）：`RealFishing`、`IPlatform`、`ModItems`、`ModEntities`、`RodItem`、`FloatRodItem`、`BobberEntity`、`RealFishingCommands`；M1 新增 `fishing/`（`FishingState`/`FishingSession`/`CastMath`/`FishingManager`）、`data/FishingSavedData`、`net/CastC2S`、`client/`（`BobberRenderer`/`FishingHud`/`ClientCast`/`ClientSetup`/`DebugAutoCast`）；M2 新增 `physics/FishingLine`、`client/ClientLineSim`、`client/ClientLineRenderer`；M3 新增 `fishing/FightModel`、`net/{ReelC2S,PumpC2S,DragC2S,SessionS2C}`、`client/ClientFight`（张力/体力 HUD 在 `FishingHud`）；M4 新增 `data/`（`FishEntry`/`FishTable`/`FishTableLoader`）、资源 `data/realfishing/fish/*.json`、`tags/worldgen/biome`、`tags/items`、`recipes`、`sounds` + `sounds.json` | ✅ M0–M4 |
 | `fabric/` / `forge/` | 平台实现：入口类 + `*Platform` + 资源/元数据 | ✅ M0 |
 | `build-tools/rcon.js` | 开发期 RCON 客户端（`node build-tools/rcon.js <pass> <cmd...>`），**不随模组发布** | 🔧 工具 |
 | `common/.../client/DebugAutoCast` | 开发期自动抛投：设 `REALFISHING_AUTOCAST=1` 后进世界自动塞竿、蓄力、松手，用于无输入环境冒烟测试 | 🔧 工具 |
 
-**没有的东西**：M4 及以后的内容（鱼表 JSON、战利品物品、音效、配方）。搏鱼已是完整的服务端权威实现：C2S 有 `CastC2S`/`ReelC2S`/`PumpC2S`/`DragC2S`，S2C 有 10 Hz 的 `SessionS2C`；HUD 有蓄力条与张力/体力条。
+**没有的东西**：M5 起的手感/美术（3D 竿模型、甩竿动画、相机 spring arm）。M4 已补齐 `data/FishEntry`、`data/FishTable`、`data/FishTableLoader`、8 条 `data/realfishing/fish/*.json`、5 个群系 tag、2 个饵 tag、5 种生鱼 + 2 种饵物品、创造标签、3 个配方、6 个音效与 `sounds.json`、`registry/ModSounds`。搏鱼已是完整的服务端权威实现：C2S 有 `CastC2S`/`ReelC2S`/`PumpC2S`/`DragC2S`，S2C 有 10 Hz 的 `SessionS2C`；HUD 有蓄力条与张力/体力条。
 
 ---
 
@@ -191,7 +191,7 @@ cd F:\RealisticFishing
 - [x] M1 已验证：`CastMathTest` 覆盖 AC-2 射程；Fabric/Forge 双端实测 `cast accepted → landed`，浮漂与鱼线可见。
 - [x] M2 已验证：`FishingLineTest` 4 项 + 双端截图（线从竿尖自然下垂到浮漂）。
 - [x] M3 已验证：`FightModelTest` 6 项；自动冒烟 tier=1 收线 → LANDING → 背包 `salmon×1`、状态回 IDLE；drag=0 猛收线 `tension=1.02` → SNAPPED。
-- [ ] M4 待做：鱼表 JSON、战利品物品、音效、配方。
+- [x] M4 已验证：`FishEntryTest` 6 项；自然咬钩选中 `pike` → LANDING → 背包 `raw_trout×1`、状态回 IDLE；`zz_broken.json` 报 ERROR 跳过、其余 8 条照常加载。
 
 ---
 
@@ -203,4 +203,4 @@ cd F:\RealisticFishing
 
 ---
 
-*本文件随项目演进更新；最后更新：M3 搏鱼完成（2026-11-07）。*
+*本文件随项目演进更新；最后更新：M4 鱼表与内容完成（2026-11-07）。*

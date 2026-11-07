@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:string" },
+    { "item": "minecraft:wheat_seeds" }
+  ],
+  "result": { "item": "realfishing:bait_insect", "count": 2 }
+}

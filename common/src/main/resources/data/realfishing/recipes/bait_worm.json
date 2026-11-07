@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:string" },
+    { "item": "minecraft:dirt" }
+  ],
+  "result": { "item": "realfishing:bait_worm", "count": 2 }
+}

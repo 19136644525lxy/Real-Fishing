@@ -68,13 +68,29 @@ SPEC §10 给的是"每 tick"量纲，FishingLine 内部统一换算成"每秒"�
 | 上鱼判定 | 体力 ≤ 0 且张力 < 0.6 且（水平距离 < 2.5 或线 ≤ 1.6） | M3 简化；M4 接鱼表后再细分 |
 | 断线表现 | `ITEM_BREAK` 音效 + 水花 + SNAPPED 0.8 s | 不进冷却，直接可重抛 |
 
+## 内容表与咬钩（M4）
+
+鱼表是数据包 JSON（`data/realfishing/fish/*.json`），服务端重载时加载；坏条目只记 ERROR 并跳过。
+
+| 参数 | 值 | 备注 |
+|---|---|---|
+| `bite.min / max` | 60 / 300 tick（3–15 s） | 落水后随机取一次；没选到鱼就重掷 |
+| `bite.window` | 16 tick（0.8 s） | 错过窗口 = 假咬，回 WAITING |
+| `fish.*.weight` | 45–120 | 同条件内按权重轮盘赌 |
+| `bait.multiplier` | 完全匹配 1.5 / 部分 1.0 / 不匹配 0.5 | 无饵要求或空饵恒 1.0 |
+| `fish.*.loot` | 每条独立 roll（`chance`） | 物品在发放时才解析，未注册只 WARN |
+| `fish.*.xp` | 1–6（河鱼 5–9） | 上鱼时随机取区间 |
+| 8 条鱼 | rainbow_trout / crucian_carp / silver_carp / sea_bass / mackerel / swamp_catfish / cave_eel / pike | 覆盖河/湖/海/沼泽/洞穴 |
+
 ## 变更日志
 
 | 日期 | 参数 | 旧 → 新 | 原因 | 评分 | 备注 |
 |---|---|---|---|---|---|
 | 2026-11-07 | `cast.gravity` / `cast.airDrag` | — → 6.0 / 0.02 | 按 AC-2 反推，SPEC §12 的 tick 量纲无法满足 8–24 格 | — | 待 M3 手感实测后复核 |
 | 2026-11-07 | `line.iterations` | 固定 10 → 自适应（≤40，maxStrain≤0.01 停） | 固定 10 次在绷紧时会把 10 格线拉长 7%，单测直接失败 | — | 长跑 25k tick 稳定 |
-| 2026-11-07 | ight.* | 基线 | M3 首次实测：tier=1 收线约 15 s 上鱼；断线在 tension=1.02 触发 | — | 手感待 M5 加动画后复核 |
+| 2026-11-07 | `fight.*` | 基线 | M3 首次实测：tier=1 收线约 15 s 上鱼；断线在 tension=1.02 触发 | — | 手感待 M5 加动画后复核 |
+| 2026-11-07 | `fish.rainbow_trout` / `fish.pike` 的 `max_water_depth` | 8 / 6 → 12 / 16 | 首测点河流水深 9，整表无候选、永远不咬钩 | — | 深度从水面方块向下数 |
+| 2026-11-07 | `fish.*` 基线 | — → 8 条 | M4 实测：自然咬钩选中 `realfishing:pike`，上鱼后 `raw_trout×1` 入包 | — | 坏 JSON 跳过验证通过 |
 
 ## 调参方法
 

@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 
 /**
  * 开发期冒烟测试：设置环境变量 REALFISHING_AUTOCAST=1 时，进世界后自动走一遍
@@ -77,11 +78,36 @@ final class DebugAutoCast {
             case 4 -> {
                 if (age > 180) {
                     shot(client, "autocast-landed.png");
+                    if ("1".equals(System.getenv("REALFISHING_NOFIGHT"))) {
+                        // 只验证咬钩与鱼表选鱼，不强制进搏鱼。
+                        RealFishing.LOGGER.info("[M4] autocast: waiting for natural bite");
+                        stage = 8;
+                        return;
+                    }
+                    if (ClientFight.state() != dev.realfishing.fishing.FishingState.BITE) {
+                        // 等自然咬钩，让鱼表真正参与选鱼；超时则回退到强制 tier。
+                        if (age > 700) {
+                            serverCommand(client, "realfishing debug fight "
+                                    + client.player.getGameProfile().getName());
+                            RealFishing.LOGGER.info("[M3] autocast: fight forced (no bite in time)");
+                            stage = 5;
+                        }
+                        return;
+                    }
                     // 控制台身份没有玩家上下文，用 target 参数形式指定玩家。
                     serverCommand(client, "realfishing debug fight "
                             + client.player.getGameProfile().getName());
-                    RealFishing.LOGGER.info("[M3] autocast: fight requested");
+                    RealFishing.LOGGER.info("[M3] autocast: fight requested after bite");
                     stage = 5;
+                }
+            }
+            case 8 -> {
+                if (ClientFight.state() == dev.realfishing.fishing.FishingState.BITE) {
+                    RealFishing.LOGGER.info("[M4] autocast: bite observed, state={}", ClientFight.state());
+                    stage = 9;
+                } else if (age > 1200) {
+                    RealFishing.LOGGER.info("[M4] autocast: no bite within 60s, state={}", ClientFight.state());
+                    stage = 9;
                 }
             }
             case 5 -> {
@@ -106,35 +132,20 @@ final class DebugAutoCast {
                 if (ClientFight.state() != dev.realfishing.fishing.FishingState.FIGHTING || age > 1200) {
                     shot(client, "autocast-fight.png");
                     client.options.keyUse.setDown(false);
-                    int cod = 0;
-                    int salmon = 0;
-                    for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
-                        var stack = client.player.getInventory().getItem(i);
-                        if (stack.is(net.minecraft.world.item.Items.COD)) {
-                            cod += stack.getCount();
-                        } else if (stack.is(net.minecraft.world.item.Items.SALMON)) {
-                            salmon += stack.getCount();
-                        }
-                    }
-                    RealFishing.LOGGER.info("[M3] autocast: fight end state={} cod={} salmon={}",
-                            ClientFight.state(), cod, salmon);
+                    RealFishing.LOGGER.info("[M3] autocast: fight end state={} cod={} salmon={} rawTrout={}",
+                            ClientFight.state(), count(client, net.minecraft.world.item.Items.COD),
+                            count(client, net.minecraft.world.item.Items.SALMON),
+                            count(client, dev.realfishing.registry.ModItems.RAW_TROUT.get()));
                     stage = 7;
                 }
             }
             case 7 -> {
                 if (age > 1250) {
-                    int cod2 = 0;
-                    int salmon2 = 0;
-                    for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
-                        var stack = client.player.getInventory().getItem(i);
-                        if (stack.is(net.minecraft.world.item.Items.COD)) {
-                            cod2 += stack.getCount();
-                        } else if (stack.is(net.minecraft.world.item.Items.SALMON)) {
-                            salmon2 += stack.getCount();
-                        }
-                    }
-                    RealFishing.LOGGER.info("[M3] autocast: inventory cod={} salmon={} state={}",
-                            cod2, salmon2, ClientFight.state());
+                    RealFishing.LOGGER.info("[M3] autocast: inventory cod={} salmon={} rawTrout={} state={}",
+                            count(client, net.minecraft.world.item.Items.COD),
+                            count(client, net.minecraft.world.item.Items.SALMON),
+                            count(client, dev.realfishing.registry.ModItems.RAW_TROUT.get()),
+                            ClientFight.state());
                     shot(client, "autocast-late.png");
                     stage = 8;
                 }
@@ -154,6 +165,17 @@ final class DebugAutoCast {
     }
 
     /** 没有外部截图能力时的自检：让游戏自己把画面存到 screenshots/。 */
+    private static int count(Minecraft client, Item item) {
+        int total = 0;
+        for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = client.player.getInventory().getItem(i);
+            if (stack.is(item)) {
+                total += stack.getCount();
+            }
+        }
+        return total;
+    }
+
     private static void shot(Minecraft client, String name) {
         if (!"1".equals(System.getenv("REALFISHING_SHOT"))) {
             return;

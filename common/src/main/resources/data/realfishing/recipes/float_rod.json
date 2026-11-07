@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "  R",
+    " RS",
+    "R S"
+  ],
+  "key": {
+    "R": { "item": "minecraft:stick" },
+    "S": { "item": "minecraft:string" }
+  },
+  "result": { "item": "realfishing:float_rod", "count": 1 }
+}

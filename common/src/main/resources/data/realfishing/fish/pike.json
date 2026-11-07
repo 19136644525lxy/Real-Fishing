@@ -1,0 +1,21 @@
+{
+  "display_name": "狗鱼",
+  "strength": 0.7,
+  "stamina_seconds": 20,
+  "turn_rate": 0.4,
+  "weight": 45,
+  "conditions": {
+    "biomes": ["#realfishing:is_river", "#minecraft:is_taiga"],
+    "time": ["dawn_dusk", "day"],
+    "weather": ["clear", "rain"],
+    "min_water_depth": 2,
+    "max_water_depth": 16,
+    "bait": ["#realfishing:bait_insect"]
+  },
+  "loot": [
+    { "item": "realfishing:raw_trout", "count": [1, 1], "chance": 0.85 },
+    { "item": "minecraft:bone", "count": [1, 1], "chance": 0.2 }
+  ],
+  "xp": [5, 9],
+  "rod_styles": ["float", "lure"]
+}

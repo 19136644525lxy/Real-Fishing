@@ -59,6 +59,11 @@ public final class FightModel {
         };
     }
 
+    /** 按鱼表数据创建：strength / stamina_seconds / turn_rate 直接来自 JSON（M4）。 */
+    public static FightModel ofFish(float strength, float staminaSeconds, float turnRate, long seed) {
+        return new FightModel(strength, staminaSeconds, turnRate, seed);
+    }
+
     /**
      * 推进一个 tick。
      *

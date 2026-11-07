@@ -1,0 +1,44 @@
+{
+  "reel": {
+    "category": "player",
+    "subtitle": "subtitles.realfishing.reel",
+    "sounds": [
+      { "name": "realfishing:reel", "stream": true }
+    ]
+  },
+  "snap": {
+    "category": "player",
+    "subtitle": "subtitles.realfishing.snap",
+    "sounds": [
+      "realfishing:snap"
+    ]
+  },
+  "bite": {
+    "category": "player",
+    "subtitle": "subtitles.realfishing.bite",
+    "sounds": [
+      "realfishing:bite"
+    ]
+  },
+  "cast": {
+    "category": "player",
+    "subtitle": "subtitles.realfishing.cast",
+    "sounds": [
+      "realfishing:cast"
+    ]
+  },
+  "catch": {
+    "category": "player",
+    "subtitle": "subtitles.realfishing.catch",
+    "sounds": [
+      "realfishing:catch"
+    ]
+  },
+  "land": {
+    "category": "player",
+    "subtitle": "subtitles.realfishing.land",
+    "sounds": [
+      "realfishing:land"
+    ]
+  }
+}

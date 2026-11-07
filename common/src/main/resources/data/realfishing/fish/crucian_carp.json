@@ -1,0 +1,20 @@
+{
+  "display_name": "鲫鱼",
+  "strength": 0.2,
+  "stamina_seconds": 7,
+  "turn_rate": 0.9,
+  "weight": 120,
+  "conditions": {
+    "biomes": ["#realfishing:is_lake"],
+    "time": ["day"],
+    "weather": ["clear", "rain"],
+    "min_water_depth": 1,
+    "max_water_depth": 5,
+    "bait": ["#realfishing:bait_worm"]
+  },
+  "loot": [
+    { "item": "realfishing:raw_carp", "count": [1, 1], "chance": 0.95 }
+  ],
+  "xp": [1, 2],
+  "rod_styles": ["float"]
+}

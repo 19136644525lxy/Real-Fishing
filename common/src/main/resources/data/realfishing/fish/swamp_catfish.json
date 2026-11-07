@@ -1,0 +1,21 @@
+{
+  "display_name": "沼泽鲶鱼",
+  "strength": 0.65,
+  "stamina_seconds": 22,
+  "turn_rate": 0.35,
+  "weight": 50,
+  "conditions": {
+    "biomes": ["#realfishing:is_swamp"],
+    "time": ["night", "dawn_dusk"],
+    "weather": ["clear", "rain", "thunder"],
+    "min_water_depth": 2,
+    "max_water_depth": 8,
+    "bait": ["#realfishing:bait_worm"]
+  },
+  "loot": [
+    { "item": "realfishing:raw_catfish", "count": [1, 1], "chance": 0.9 },
+    { "item": "minecraft:slime_ball", "count": [1, 1], "chance": 0.1 }
+  ],
+  "xp": [4, 8],
+  "rod_styles": ["float"]
+}

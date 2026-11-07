@@ -1,7 +1,9 @@
 package dev.realfishing;
 
+import dev.architectury.registry.ReloadListenerRegistry;
 import dev.realfishing.client.ClientSetup;
 import dev.realfishing.command.RealFishingCommands;
+import dev.realfishing.data.FishTableLoader;
 import dev.realfishing.fishing.FishingManager;
 import dev.realfishing.net.CastC2S;
 import dev.realfishing.net.DragC2S;
@@ -12,6 +14,8 @@ import dev.realfishing.platform.IPlatform;
 import dev.realfishing.platform.Platform;
 import dev.realfishing.registry.ModEntities;
 import dev.realfishing.registry.ModItems;
+import dev.realfishing.registry.ModSounds;
+import net.minecraft.server.packs.PackType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +41,8 @@ public final class RealFishing {
     public static void register() {
         ModItems.register();
         ModEntities.register();
+        ModSounds.register();
+        ReloadListenerRegistry.register(PackType.SERVER_DATA, new FishTableLoader());
         RealFishingCommands.register();
         CastC2S.register();
         ReelC2S.register();

@@ -1,0 +1,20 @@
+{
+  "display_name": "银鲤",
+  "strength": 0.35,
+  "stamina_seconds": 12,
+  "turn_rate": 0.6,
+  "weight": 60,
+  "conditions": {
+    "biomes": ["#realfishing:is_lake"],
+    "time": ["night", "dawn_dusk"],
+    "weather": ["clear", "rain"],
+    "min_water_depth": 2,
+    "max_water_depth": 8,
+    "bait": ["#realfishing:bait_worm"]
+  },
+  "loot": [
+    { "item": "realfishing:raw_carp", "count": [1, 2], "chance": 0.9 }
+  ],
+  "xp": [2, 4],
+  "rod_styles": ["float"]
+}
