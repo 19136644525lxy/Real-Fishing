@@ -23,6 +23,7 @@ public final class RealFishingForge {
         RealFishing.register();
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ForgeWorldRender.register();
+            dev.realfishing.forge.client.ForgeHandRender.register();
         }
     }
 }

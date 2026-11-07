@@ -19,7 +19,7 @@ public final class FabricWorldRender implements ClientModInitializer {
     }
 
     private static void afterTranslucent(WorldRenderContext context) {
-        if (ClientLineSim.line() == null || context.consumers() == null) {
+        if (context.consumers() == null) {
             return;
         }
         Vec3 camera = context.camera().getPosition();
@@ -27,7 +27,10 @@ public final class FabricWorldRender implements ClientModInitializer {
         poseStack.pushPose();
         // Fabric 的栈是"世界原点"，先平移到相机相对坐标再画
         poseStack.translate(-camera.x, -camera.y, -camera.z);
-        ClientLineRenderer.render(poseStack, context.consumers(), camera, context.tickDelta());
+        if (ClientLineSim.line() != null) {
+            ClientLineRenderer.render(poseStack, context.consumers(), camera, context.tickDelta());
+        }
+        dev.realfishing.client.ClientRodRenderer.render(poseStack, context.consumers(), camera, context.tickDelta());
         poseStack.popPose();
     }
 }

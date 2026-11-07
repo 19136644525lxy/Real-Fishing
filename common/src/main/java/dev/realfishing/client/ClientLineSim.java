@@ -121,8 +121,12 @@ public final class ClientLineSim {
         return best;
     }
 
-    /** 第一人称近似：用相机基向量估算竿尖（右手、视线前方约 1 米、略高）。 */
+    /** 竿尖：优先用世界坐标竿模型的实际竿尖（M5），没在持竿时才退回相机近似。 */
     private static Vec3 rodTip(LocalPlayer player) {
+        if (ClientRodPose.active()) {
+            ClientRodPose.build(1.0F);
+            return ClientRodPose.point(ClientRodPose.SEGMENTS);
+        }
         net.minecraft.client.Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
         Vec3 look = new Vec3(camera.getLookVector());
         Vec3 right = new Vec3(camera.getLeftVector()).scale(-1.0);

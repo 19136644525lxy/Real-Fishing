@@ -38,9 +38,19 @@ public class FloatRodItem extends RodItem {
         ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide) {
             FishingManager.startCharging((ServerPlayer) player);
+        } else if (isBusyFighting()) {
+            // 搏鱼/刺鱼阶段右键是“收线”，不能进入物品使用，否则松手会走 releaseUsing 再抛一次。
+            return InteractionResultHolder.pass(stack);
         }
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
+    }
+
+    private static boolean isBusyFighting() {
+        var state = dev.realfishing.client.ClientFight.state();
+        return state == dev.realfishing.fishing.FishingState.FIGHTING
+                || state == dev.realfishing.fishing.FishingState.BITE
+                || state == dev.realfishing.fishing.FishingState.LANDING;
     }
 
     @Override

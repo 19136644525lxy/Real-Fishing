@@ -16,6 +16,8 @@ import net.minecraft.world.item.Item;
 final class DebugAutoCast {
     private static int stage;
     private static boolean disabled;
+    /** 落地截图只拍一次，避免 stage 4 每 tick 重复写盘。 */
+    private static boolean landedShot;
 
     private DebugAutoCast() {
     }
@@ -77,7 +79,10 @@ final class DebugAutoCast {
             }
             case 4 -> {
                 if (age > 180) {
-                    shot(client, "autocast-landed.png");
+                    if (!landedShot) {
+                        landedShot = true;
+                        shot(client, "autocast-landed.png");
+                    }
                     if ("1".equals(System.getenv("REALFISHING_NOFIGHT"))) {
                         // 只验证咬钩与鱼表选鱼，不强制进搏鱼。
                         RealFishing.LOGGER.info("[M4] autocast: waiting for natural bite");

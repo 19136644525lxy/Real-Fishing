@@ -37,15 +37,18 @@ public final class ForgeWorldRender {
             Vector3f t = poseStack.last().pose().getTranslation(new Vector3f());
             RealFishing.LOGGER.info("[M2] forge pose translation={} camera={}", t, camera);
         }
-        if (ClientLineSim.line() == null) {
+        if (ClientLineSim.line() == null && !dev.realfishing.client.ClientRodPose.active()) {
             return;
         }
         poseStack.pushPose();
         // Forge 这个阶段的世界矩阵原点在 (0,0,0) 还是相机，取决于版本；先按相机相对处理，
         // 若日志里 translation ≈ -camera 就说明已经是相对坐标，这里的 translate 要去掉。
         poseStack.translate(-camera.x, -camera.y, -camera.z);
-        ClientLineRenderer.render(poseStack,
-                Minecraft.getInstance().renderBuffers().bufferSource(), camera, event.getPartialTick());
+        var buffers = Minecraft.getInstance().renderBuffers().bufferSource();
+        if (ClientLineSim.line() != null) {
+            ClientLineRenderer.render(poseStack, buffers, camera, event.getPartialTick());
+        }
+        dev.realfishing.client.ClientRodRenderer.render(poseStack, buffers, camera, event.getPartialTick());
         poseStack.popPose();
     }
 }

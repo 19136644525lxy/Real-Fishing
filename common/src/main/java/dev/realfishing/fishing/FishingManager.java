@@ -515,6 +515,9 @@ public final class FishingManager {
     }
 
     private static void cleanup(ServerPlayer player, FishingSession session, long now) {
+        RealFishing.LOGGER.info("[M3] cleanup: player={} from={} bobber={} held={}",
+                player.getGameProfile().getName(), session.state, session.bobberEntityId,
+                player.getMainHandItem().getItem());
         discardBobber(player, session);
         session.reset(now);
         FIGHTS.remove(player.getUUID());
