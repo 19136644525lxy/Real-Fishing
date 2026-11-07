@@ -1,3 +1,6 @@
 {
-  "item.realfishing.float_rod": "Float Rod"
+  "item.realfishing.float_rod": "Float Rod",
+  "key.realfishing.category": "Real Fishing",
+  "key.realfishing.drag_up": "Increase Drag",
+  "key.realfishing.drag_down": "Decrease Drag"
 }

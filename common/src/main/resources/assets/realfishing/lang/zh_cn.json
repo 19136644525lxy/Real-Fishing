@@ -1,3 +1,6 @@
 {
-  "item.realfishing.float_rod": "台钓竿"
+  "item.realfishing.float_rod": "台钓竿",
+  "key.realfishing.category": "写实钓鱼",
+  "key.realfishing.drag_up": "增大泄力",
+  "key.realfishing.drag_down": "减小泄力"
 }

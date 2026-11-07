@@ -2,23 +2,35 @@ package dev.realfishing.fishing;
 
 import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
+import dev.architectury.networking.NetworkManager;
 import dev.realfishing.RealFishing;
 import dev.realfishing.data.FishingSavedData;
 import dev.realfishing.entity.BobberEntity;
 import dev.realfishing.item.FloatRodItem;
-import dev.realfishing.net.CastC2S;
+import dev.realfishing.net.SessionS2C;
 import dev.realfishing.registry.ModEntities;
+import io.netty.buffer.Unpooled;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
+
 /**
- * 服务端钓鱼会话驱动：蓄力 → 抛投 → 等漂，负责状态迁移、浮漂生成/回收与会话落盘。
- * 不负责：客户端表现（HUD/渲染在 client 包）、鱼线求解（M2）、鱼与搏鱼（M3+）。
+ * 服务端钓鱼会话驱动：蓄力 → 抛投 → 等漂 → 咬钩 → 搏鱼 → 上鱼/断线。
+ * 不负责：客户端表现（HUD/渲染在 client 包）、鱼线求解（physics 包）、鱼表数据（M4）。
  *
  * <p>所有入口都做了"玩家是否真的拿着台钓竿"的校验；客户端发来的视角若与服务端偏差
  * 超过 40°，整包丢弃，避免伪造落点。
@@ -30,9 +42,25 @@ public final class FishingManager {
     private static final int MIN_CHARGE_TICKS = 3;
     /** 客户端视角与服务端视角允许的最大偏差（度）。 */
     private static final float MAX_AIM_DELTA = 40.0F;
+    /** 咬钩窗口 0.8 s（SPEC §9.2）。 */
+    private static final int BITE_WINDOW_TICKS = 16;
+    /** 上鱼收竿动画 0.8 s。 */
+    private static final int LANDING_TICKS = 16;
+    /** 断线后保留 SNAPPED 状态 2 s 再复位。 */
+    private static final int SNAPPED_TICKS = 40;
+    /** 等漂 3–15 s。 */
+    private static final int BITE_MIN_TICKS = 60;
+    private static final int BITE_MAX_TICKS = 300;
+    /** 10 Hz 会话同步。 */
+    private static final int SYNC_INTERVAL_TICKS = 2;
+    private static final double FISH_MAX_RANGE = 40.0;
 
     private static MinecraftServer boundServer;
     private static boolean restored;
+    private static final Random RANDOM = new Random();
+    private static final Map<UUID, FightModel> FIGHTS = new HashMap<>();
+    private static final Map<UUID, Long> NEXT_BITE = new HashMap<>();
+    private static final Map<UUID, Long> NEXT_SYNC = new HashMap<>();
 
     private FishingManager() {
     }
@@ -49,7 +77,12 @@ public final class FishingManager {
         if (session.state == FishingState.CHARGING) {
             return;
         }
-        if (session.state == FishingState.WAITING || session.state == FishingState.CASTING) {
+        // 搏鱼/刺鱼期间右键是"收线"，不能把会话打回蓄力。
+        if (session.state == FishingState.FIGHTING || session.state == FishingState.BITE
+                || session.state == FishingState.LANDING) {
+            return;
+        }
+        if (session.state != FishingState.IDLE) {
             // 再按右键：先把上一竿收回来，然后同一按继续蓄力——
             // 否则玩家会以为"按了没反应"（只能收竿、不能接着抛）。
             cleanup(player, session, now);
@@ -65,7 +98,7 @@ public final class FishingManager {
     }
 
     /** 处理 CastC2S：所有字段都要重新校验，绝不信任客户端。 */
-    public static void cast(ServerPlayer player, CastC2S msg) {
+    public static void cast(ServerPlayer player, dev.realfishing.net.CastC2S msg) {
         FishingSavedData data = data(player.server);
         long now = gameTime(player.server);
         FishingSession session = data.get(player.getUUID());
@@ -123,10 +156,77 @@ public final class FishingManager {
                 player.getGameProfile().getName(), charge, CastMath.speed(charge));
     }
 
+    /** 收线键（BITE 期间按下 = 刺鱼，FIGHTING 期间 = 收/放）。 */
+    public static void reel(ServerPlayer player, boolean reeling) {
+        FishingSession session = data(player.server).get(player.getUUID());
+        if (session == null) {
+            return;
+        }
+        if (session.state == FishingState.BITE && reeling) {
+            startFight(player, session);
+            return;
+        }
+        if (session.state == FishingState.FIGHTING) {
+            session.reeling = reeling;
+        }
+    }
+
+    /** 抬竿：短时加张力、把鱼往回收一点。 */
+    public static void pump(ServerPlayer player) {
+        FishingSession session = data(player.server).get(player.getUUID());
+        if (session == null || session.state != FishingState.FIGHTING) {
+            return;
+        }
+        FightModel fight = FIGHTS.get(player.getUUID());
+        if (fight != null) {
+            fight.pump();
+        }
+    }
+
+    /** 调泄力（客户端已经 clamp 过，这里再 clamp 一次）。 */
+    public static void drag(ServerPlayer player, float drag) {
+        FishingSession session = data(player.server).get(player.getUUID());
+        if (session == null || !Float.isFinite(drag)) {
+            return;
+        }
+        session.drag = Mth.clamp(drag, 0.0, 1.0);
+    }
+
+    private static void startFight(ServerPlayer player, FishingSession session) {
+        long now = gameTime(player.server);
+        int tier = pickTier();
+        FightModel fight = FightModel.ofTier(tier, player.getUUID().getLeastSignificantBits() ^ now);
+        fight.setLineLength(Math.max(FightModel.MIN_LINE, session.lineLength));
+        FIGHTS.put(player.getUUID(), fight);
+        session.fishTier = tier;
+        session.fishStamina = 1.0;
+        session.tension = 0.0;
+        session.reeling = false;
+        session.drag = 0.2;
+        session.transition(FishingState.FIGHTING, now);
+        sync(player, session);
+        RealFishing.LOGGER.info("[M3] fight start: player={} tier={} line={}",
+                player.getGameProfile().getName(), tier, String.format("%.2f", session.lineLength));
+    }
+
+    private static int pickTier() {
+        int roll = RANDOM.nextInt(100);
+        if (roll < 55) {
+            return FightModel.TIER_SMALL;
+        }
+        if (roll < 90) {
+            return FightModel.TIER_MEDIUM;
+        }
+        return FightModel.TIER_BIG;
+    }
+
     private static void tick(MinecraftServer server) {
         if (server != boundServer) {
             boundServer = server;
             restored = false;
+            FIGHTS.clear();
+            NEXT_BITE.clear();
+            NEXT_SYNC.clear();
         }
         FishingSavedData data = data(server);
         long now = gameTime(server);
@@ -158,6 +258,7 @@ public final class FishingManager {
             return;
         }
         BobberEntity bobber = bobber(player, session);
+        UUID id = player.getUUID();
         switch (session.state) {
             case CASTING -> {
                 if (bobber == null) {
@@ -165,6 +266,7 @@ public final class FishingManager {
                 } else if (bobber.isLanded()) {
                     session.lineLength = lineLength(player, bobber);
                     session.transition(FishingState.WAITING, now);
+                    NEXT_BITE.put(id, now + BITE_MIN_TICKS + RANDOM.nextInt(BITE_MAX_TICKS - BITE_MIN_TICKS));
                     data(player.server).markDirty();
                     RealFishing.LOGGER.info("[M1] landed: player={} line={}", player.getGameProfile().getName(),
                             String.format("%.2f", session.lineLength));
@@ -180,6 +282,36 @@ public final class FishingManager {
                 session.lineLength = lineLength(player, bobber);
                 if (session.lineLength > CastMath.MAX_LINE_LENGTH) {
                     cleanup(player, session, now);
+                    return;
+                }
+                if (now >= NEXT_BITE.getOrDefault(id, now + BITE_MIN_TICKS)) {
+                    session.transition(FishingState.BITE, now);
+                    bobber.splash();
+                    sync(player, session);
+                }
+            }
+            case BITE -> {
+                if (bobber == null) {
+                    reset(player, session, now);
+                    return;
+                }
+                if (now - session.stateSince > BITE_WINDOW_TICKS) {
+                    // 错过窗口：假咬，回到等漂，重新计时。
+                    session.transition(FishingState.WAITING, now);
+                    NEXT_BITE.put(id, now + BITE_MIN_TICKS + RANDOM.nextInt(BITE_MAX_TICKS - BITE_MIN_TICKS));
+                    sync(player, session);
+                }
+            }
+            case FIGHTING -> tickFighting(player, session, bobber, now);
+            case LANDING -> {
+                if (now - session.stateSince >= LANDING_TICKS) {
+                    award(player, session);
+                    cleanup(player, session, now);
+                }
+            }
+            case SNAPPED -> {
+                if (now - session.stateSince >= SNAPPED_TICKS) {
+                    cleanup(player, session, now);
                 }
             }
             default -> {
@@ -187,14 +319,145 @@ public final class FishingManager {
         }
     }
 
+    private static void tickFighting(ServerPlayer player, FishingSession session, BobberEntity bobber, long now) {
+        UUID id = player.getUUID();
+        FightModel fight = FIGHTS.get(id);
+        if (bobber == null || fight == null) {
+            endWithSnap(player, session, now, false);
+            return;
+        }
+        double dt = 0.05;
+        fight.step(dt, player.getX(), player.getZ(), bobber.getX(), bobber.getZ(),
+                session.reeling, session.drag);
+
+        // 鱼拖动浮漂：新位置不是水就掉头，避免鱼"游上岸"。
+        double nx = bobber.getX() + fight.vx() * dt;
+        double nz = bobber.getZ() + fight.vz() * dt;
+        BlockPos next = BlockPos.containing(nx, bobber.getY(), nz);
+        boolean water = !player.serverLevel().getFluidState(next).isEmpty();
+        if (water) {
+            double dist = Math.sqrt(player.distanceToSqr(nx, player.getY(), nz));
+            if (dist <= FISH_MAX_RANGE) {
+                bobber.setPos(nx, bobber.getY(), nz);
+            }
+        } else {
+            fight.bounce();
+        }
+
+        session.tension = fight.tension();
+        session.fishStamina = fight.stamina();
+        session.lineLength = fight.lineLength();
+
+        if (fight.isSnapped()) {
+            endWithSnap(player, session, now, true);
+            return;
+        }
+        // 只比水平距离：玩家站在岸上时浮漂可能低 2~3 格，用 3D 距离会永远够不着。
+        // 线收到最短也算"到脚边"——岸边有落差时浮漂被水岸挡住，水平距离可能永远 > 2.5。
+        double dx = player.getX() - bobber.getX();
+        double dz = player.getZ() - bobber.getZ();
+        boolean close = dx * dx + dz * dz < 6.25 || fight.lineLength() <= FightModel.MIN_LINE + 0.1;
+        if (fight.stamina() <= 0.0 && session.tension < 0.6 && close) {
+            session.transition(FishingState.LANDING, now);
+            bobber.splash();
+            player.serverLevel().playSound(null, bobber.blockPosition(), SoundEvents.FISHING_BOBBER_RETRIEVE,
+                    player.getSoundSource(), 1.0F, 1.2F);
+            sync(player, session);
+            data(player.server).markDirty();
+            return;
+        }
+
+        Long nextSync = NEXT_SYNC.get(id);
+        if (nextSync == null || now >= nextSync) {
+            NEXT_SYNC.put(id, now + SYNC_INTERVAL_TICKS);
+            sync(player, session);
+        }
+    }
+
+    private static void endWithSnap(ServerPlayer player, FishingSession session, long now, boolean snapped) {
+        if (snapped) {
+            ServerLevel level = player.serverLevel();
+            Vec3 at = session.bobberEntityId >= 0 && level.getEntity(session.bobberEntityId) != null
+                    ? level.getEntity(session.bobberEntityId).position()
+                    : player.position();
+            level.playSound(null, BlockPos.containing(at), SoundEvents.ITEM_BREAK, player.getSoundSource(), 1.0F, 0.8F);
+            level.sendParticles(ParticleTypes.SPLASH, at.x, at.y, at.z, 16, 0.3, 0.3, 0.3, 0.05);
+            RealFishing.LOGGER.info("[M3] line snapped: player={} tension={}",
+                    player.getGameProfile().getName(), String.format("%.2f", session.tension));
+        }
+        session.transition(FishingState.SNAPPED, now);
+        discardBobber(player, session);
+        FIGHTS.remove(player.getUUID());
+        sync(player, session);
+        data(player.server).markDirty();
+    }
+
+    private static void award(ServerPlayer player, FishingSession session) {
+        ItemStack loot = switch (session.fishTier) {
+            case FightModel.TIER_SMALL -> new ItemStack(Items.COD);
+            case FightModel.TIER_BIG -> new ItemStack(Items.COD, 3);
+            default -> new ItemStack(Items.SALMON);
+        };
+        if (!player.getInventory().add(loot)) {
+            player.drop(loot, false);
+        }
+        player.giveExperiencePoints(1 + RANDOM.nextInt(6));
+        RealFishing.LOGGER.info("[M3] landed fish: player={} tier={}",
+                player.getGameProfile().getName(), session.fishTier);
+    }
+
+    private static void sync(ServerPlayer player, FishingSession session) {
+        Entity entity = session.bobberEntityId >= 0 ? player.serverLevel().getEntity(session.bobberEntityId) : null;
+        Vec3 p = entity != null ? entity.position() : player.position();
+        SessionS2C msg = SessionS2C.of(session.sessionId, session.state, session.tension, session.fishStamina,
+                session.lineLength, p.x, p.y, p.z);
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        msg.write(buf);
+        NetworkManager.sendToPlayer(player, SessionS2C.ID, buf);
+    }
+
+    /** 调试用：直接进入搏鱼，跳过等漂（M4 接上鱼表前用于手感调参）。 */
+    public static boolean debugStartFight(ServerPlayer player, int tier) {
+        FishingSavedData data = data(player.server);
+        FishingSession session = data.get(player.getUUID());
+        if (session == null || session.state == FishingState.IDLE) {
+            return false;
+        }
+        if (session.bobberEntityId < 0) {
+            return false;
+        }
+        long now = gameTime(player.server);
+        FightModel fight = FightModel.ofTier(tier, now);
+        fight.setLineLength(Math.max(FightModel.MIN_LINE, session.lineLength));
+        FIGHTS.put(player.getUUID(), fight);
+        session.fishTier = tier;
+        session.fishStamina = 1.0;
+        session.tension = 0.0;
+        session.drag = 0.2;
+        session.transition(FishingState.FIGHTING, now);
+        sync(player, session);
+        data.markDirty();
+        return true;
+    }
+
     private static void cleanup(ServerPlayer player, FishingSession session, long now) {
         discardBobber(player, session);
         session.reset(now);
+        FIGHTS.remove(player.getUUID());
+        NEXT_BITE.remove(player.getUUID());
+        NEXT_SYNC.remove(player.getUUID());
         data(player.server).markDirty();
+        // 收竿/上鱼/断线都要推一次 IDLE，否则客户端 HUD 会停在最后一个状态。
+        SessionS2C idle = SessionS2C.of(session.sessionId, FishingState.IDLE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        FriendlyByteBuf idleBuf = new FriendlyByteBuf(Unpooled.buffer());
+        idle.write(idleBuf);
+        NetworkManager.sendToPlayer(player, SessionS2C.ID, idleBuf);
     }
 
     private static void reset(ServerPlayer player, FishingSession session, long now) {
         session.reset(now);
+        FIGHTS.remove(player.getUUID());
+        NEXT_BITE.remove(player.getUUID());
         data(player.server).markDirty();
     }
 
@@ -241,6 +504,9 @@ public final class FishingManager {
             data.remove(player.getUUID());
             data.markDirty();
         }
+        FIGHTS.remove(player.getUUID());
+        NEXT_BITE.remove(player.getUUID());
+        NEXT_SYNC.remove(player.getUUID());
     }
 
     private static String dimension(ServerPlayer player) {

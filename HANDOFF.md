@@ -7,7 +7,7 @@
 
 ## 1. 一句话现状
 
-**M0 骨架 + M1 抛投 + M2 鱼线已完成**，Fabric 端已实测蓄力→抛投→入水→浮漂/鱼线渲染全链路；下一步 M3 搏鱼。
+**M0 骨架 + M1 抛投 + M2 鱼线 + M3 搏鱼已完成**，双端实测：蓄力→抛投→入水→浮漂/鱼线渲染→咬钩→张力条/体力条→收线→上鱼入包（salmon×1）/断线。下一步 M4 内容（鱼表/战利品/音效/配方）。
 
 - 目标：Minecraft 1.20.1 写实钓鱼模组，Fabric + Forge 双端，Architectury 三层，纯 Java 物理。
 - 进度：M0、M1、M2 已勾选完成（`ROADMAP.md`）；M3–M6（v0.1 台钓竿）待开工；M9（v0.2 路亚竿）只有规格。
@@ -35,12 +35,12 @@
 | `gradle.properties` | 版本锁定（SPEC §7.1）：MC 1.20.1 / Architectury 9.2.14 / Loom 1.7.417 / Forge 47.3.33 | ✅ |
 | `settings.gradle` / `build.gradle` | 三模块工程 + 统一 toolchain 17 / JUnit 5 | ✅ |
 | `gradlew` / `gradle/wrapper` | Gradle 8.8 wrapper（`validateDistributionUrl=false`） | ✅ |
-| `common/` | 玩法/物理/数据层（无平台 import）：`RealFishing`、`IPlatform`、`ModItems`、`ModEntities`、`RodItem`、`FloatRodItem`、`BobberEntity`、`RealFishingCommands`；M1 新增 `fishing/`（`FishingState`/`FishingSession`/`CastMath`/`FishingManager`）、`data/FishingSavedData`、`net/CastC2S`、`client/`（`BobberRenderer`/`FishingHud`/`ClientCast`/`ClientSetup`/`DebugAutoCast`）；M2 新增 `physics/FishingLine`、`client/ClientLineSim`、`client/ClientLineRenderer` | ✅ M0/M1/M2 |
+| `common/` | 玩法/物理/数据层（无平台 import）：`RealFishing`、`IPlatform`、`ModItems`、`ModEntities`、`RodItem`、`FloatRodItem`、`BobberEntity`、`RealFishingCommands`；M1 新增 `fishing/`（`FishingState`/`FishingSession`/`CastMath`/`FishingManager`）、`data/FishingSavedData`、`net/CastC2S`、`client/`（`BobberRenderer`/`FishingHud`/`ClientCast`/`ClientSetup`/`DebugAutoCast`）；M2 新增 `physics/FishingLine`、`client/ClientLineSim`、`client/ClientLineRenderer`；M3 新增 `fishing/FightModel`、`net/{ReelC2S,PumpC2S,DragC2S,SessionS2C}`、`client/ClientFight`（张力/体力 HUD 在 `FishingHud`） | ✅ M0–M3 |
 | `fabric/` / `forge/` | 平台实现：入口类 + `*Platform` + 资源/元数据 | ✅ M0 |
 | `build-tools/rcon.js` | 开发期 RCON 客户端（`node build-tools/rcon.js <pass> <cmd...>`），**不随模组发布** | 🔧 工具 |
 | `common/.../client/DebugAutoCast` | 开发期自动抛投：设 `REALFISHING_AUTOCAST=1` 后进世界自动塞竿、蓄力、松手，用于无输入环境冒烟测试 | 🔧 工具 |
 
-**没有的东西**：M3 及以后的玩法代码（`FightModel` 搏鱼、鱼表、音效、S2C 会话同步）。目前只有 C2S 的 `CastC2S`；HUD 只有蓄力条，没有张力/鱼讯。
+**没有的东西**：M4 及以后的内容（鱼表 JSON、战利品物品、音效、配方）。搏鱼已是完整的服务端权威实现：C2S 有 `CastC2S`/`ReelC2S`/`PumpC2S`/`DragC2S`，S2C 有 10 Hz 的 `SessionS2C`；HUD 有蓄力条与张力/体力条。
 
 ---
 
@@ -130,7 +130,7 @@ cd F:\RealisticFishing
 
 ---
 
-## 5. 已解决的未知项 & M0–M2 踩坑（务必先看）
+## 5. 已解决的未知项 & M0–M3 踩坑（务必先看）
 
 **三个未知项现状：**
 
@@ -153,6 +153,11 @@ cd F:\RealisticFishing
 | 按住右键进度条满了却抛不出去 | `getUseDuration` 返回 40 tick，到第 40 tick 物品使用自动结束，`releaseUsing` 不再触发 | 改成弓式 `USE_DURATION = 72000`，蓄力读 `player.getTicksUsingItem()` |
 | 自动抛投 `used` 一直是 0 | `Minecraft.handleKeybinds` 每 tick 检查右键，键没按下就立刻 `releaseUsingItem` | 自动化要 `client.options.keyUse.setDown(true/false)` 模拟按住 |
 | 鱼线/浮漂看不见 | 浮漂四边形太小（0.18 格宽，8 格外只有几像素），且落点正好被准星挡住 | 放大到 0.32×0.44；`land()` 向上找到最上层水方块再贴水面 +0.08 |
+| 鱼线起点跑到准星下方而不是竿尖 | Fabric 的相机基向量与世界渲染存在约 0.39 的比例差，按 FOV 算出的偏移只有实际渲染的 2.5 倍 | 用四标记定标得出 `x = 427 + 134·(right/forward)`，竿尖取 `look*0.45 + right*0.88` |
+| Forge 端鱼线完全不显示 | `RenderLevelStageEvent` 的 pose 栈原点在相机，没有相机平移 | 自己 `poseStack.translate(-camera.x, -camera.y, -camera.z)`（Fabric 的 `WorldRenderEvents` 已做过平移，只做一次） |
+| 搏鱼时鱼永远"上不来" | 上鱼判定用 `player.distanceToSqr(bobber)`，站在岸上时浮漂低 2–3 格，永远 > 4 | 改为水平距离 < 2.5 或线收到 `MIN_LINE+0.1` |
+| 上鱼后 HUD 卡在 LANDING | `cleanup()` 只清服务端会话，不推最后一帧 | `cleanup()` 末尾推一次 `SessionS2C(IDLE)` |
+| 控制台执行 `debug fight` 报 "A player is required" | 命令用 `context.getSource().getPlayerOrException()`，控制台源没有玩家 | 自动化里用 `debug fight <玩家名>` 的 target 形式 |
 
 **调试入口**：`build-tools/rcon.js`（Node 写的极简 RCON 客户端，改 `forge/run-server/server.properties` 开 `enable-rcon` 后用 `node build-tools/rcon.js <pass> <cmd...>`）。`/realfishing version` 已验证返回 `Real Fishing 0.1.0 (forge)`，`summon realfishing:bobber` 也能生成实体。
 
@@ -182,7 +187,11 @@ cd F:\RealisticFishing
 - [x] 两张 32×32 图标已知落位路径（上面 §3.2）；
 - [x] 知道 v0.1 只做 `float_rod`，`lure_rod` 是 M9；
 - [x] 知道 mixin 上限 8，且新增必须登记 `docs/mixins.md`；
-- [x] M0 已验证：`common` 无平台 import、双端进世界、`/realfishing version` 与浮漂实体可用。\n- [x] M1 已验证：`CastMathTest` 覆盖 AC-2 射程；Fabric 端 `REALFISHING_AUTOCAST=1` 实测 `cast accepted → landed line=9.07`（charge=0.25）。\n- [ ] M1 待人工确认：蓄力条与浮漂贴图的**视觉效果**（自动化环境无法截图）。
+- [x] M0 已验证：`common` 无平台 import、双端进世界、`/realfishing version` 与浮漂实体可用。
+- [x] M1 已验证：`CastMathTest` 覆盖 AC-2 射程；Fabric/Forge 双端实测 `cast accepted → landed`，浮漂与鱼线可见。
+- [x] M2 已验证：`FishingLineTest` 4 项 + 双端截图（线从竿尖自然下垂到浮漂）。
+- [x] M3 已验证：`FightModelTest` 6 项；自动冒烟 tier=1 收线 → LANDING → 背包 `salmon×1`、状态回 IDLE；drag=0 猛收线 `tension=1.02` → SNAPPED。
+- [ ] M4 待做：鱼表 JSON、战利品物品、音效、配方。
 
 ---
 
@@ -194,4 +203,4 @@ cd F:\RealisticFishing
 
 ---
 
-*本文件随项目演进更新；最后更新：M1 抛投完成（2026-11-07）。*
+*本文件随项目演进更新；最后更新：M3 搏鱼完成（2026-11-07）。*

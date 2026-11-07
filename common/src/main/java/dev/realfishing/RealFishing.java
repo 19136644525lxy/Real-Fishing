@@ -4,6 +4,10 @@ import dev.realfishing.client.ClientSetup;
 import dev.realfishing.command.RealFishingCommands;
 import dev.realfishing.fishing.FishingManager;
 import dev.realfishing.net.CastC2S;
+import dev.realfishing.net.DragC2S;
+import dev.realfishing.net.PumpC2S;
+import dev.realfishing.net.ReelC2S;
+import dev.realfishing.net.SessionS2C;
 import dev.realfishing.platform.IPlatform;
 import dev.realfishing.platform.Platform;
 import dev.realfishing.registry.ModEntities;
@@ -35,6 +39,10 @@ public final class RealFishing {
         ModEntities.register();
         RealFishingCommands.register();
         CastC2S.register();
+        ReelC2S.register();
+        PumpC2S.register();
+        DragC2S.register();
+        SessionS2C.register();
         FishingManager.register();
         // 客户端专用内容（渲染器/HUD）只在物理客户端加载，专用服务器不会碰 client 包
         if (Platform.get().isClient()) {

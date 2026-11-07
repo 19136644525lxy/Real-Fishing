@@ -77,12 +77,80 @@ final class DebugAutoCast {
             case 4 -> {
                 if (age > 180) {
                     shot(client, "autocast-landed.png");
+                    // 控制台身份没有玩家上下文，用 target 参数形式指定玩家。
+                    serverCommand(client, "realfishing debug fight "
+                            + client.player.getGameProfile().getName());
+                    RealFishing.LOGGER.info("[M3] autocast: fight requested");
                     stage = 5;
+                }
+            }
+            case 5 -> {
+                if (age > 200) {
+                    if ("1".equals(System.getenv("REALFISHING_SNAP"))) {
+                        // 泄力拧到 0，再猛收线 → 张力必破 1.0，验证断线分支。
+                        new dev.realfishing.net.DragC2S(0.0F).sendToServer();
+                        RealFishing.LOGGER.info("[M3] autocast: snap mode, drag=0");
+                    }
+                    // 按住右键收线，验证 ReelC2S → 张力上升链路。
+                    client.options.keyUse.setDown(true);
+                    RealFishing.LOGGER.info("[M3] autocast: reeling, state={}", ClientFight.state());
+                    stage = 6;
+                }
+            }
+            case 6 -> {
+                if (age % 40 == 0) {
+                    RealFishing.LOGGER.info("[M3] autocast: fight state={} tension={} stamina={} line={}",
+                            ClientFight.state(), ClientFight.tension(), ClientFight.stamina(), ClientFight.lineLength());
+                }
+                // 一直按住收线，直到上鱼（LANDING/IDLE）或超时；这样能覆盖完整搏鱼→上鱼链路。
+                if (ClientFight.state() != dev.realfishing.fishing.FishingState.FIGHTING || age > 1200) {
+                    shot(client, "autocast-fight.png");
+                    client.options.keyUse.setDown(false);
+                    int cod = 0;
+                    int salmon = 0;
+                    for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
+                        var stack = client.player.getInventory().getItem(i);
+                        if (stack.is(net.minecraft.world.item.Items.COD)) {
+                            cod += stack.getCount();
+                        } else if (stack.is(net.minecraft.world.item.Items.SALMON)) {
+                            salmon += stack.getCount();
+                        }
+                    }
+                    RealFishing.LOGGER.info("[M3] autocast: fight end state={} cod={} salmon={}",
+                            ClientFight.state(), cod, salmon);
+                    stage = 7;
+                }
+            }
+            case 7 -> {
+                if (age > 1250) {
+                    int cod2 = 0;
+                    int salmon2 = 0;
+                    for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
+                        var stack = client.player.getInventory().getItem(i);
+                        if (stack.is(net.minecraft.world.item.Items.COD)) {
+                            cod2 += stack.getCount();
+                        } else if (stack.is(net.minecraft.world.item.Items.SALMON)) {
+                            salmon2 += stack.getCount();
+                        }
+                    }
+                    RealFishing.LOGGER.info("[M3] autocast: inventory cod={} salmon={} state={}",
+                            cod2, salmon2, ClientFight.state());
+                    shot(client, "autocast-late.png");
+                    stage = 8;
                 }
             }
             default -> {
             }
         }
+    }
+
+    /** 用内置服务端的控制台身份执行命令，绕开单人存档没开作弊的限制。 */
+    private static void serverCommand(Minecraft client, String command) {
+        var server = client.getSingleplayerServer();
+        if (server == null) {
+            return;
+        }
+        server.execute(() -> server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command));
     }
 
     /** 没有外部截图能力时的自检：让游戏自己把画面存到 screenshots/。 */

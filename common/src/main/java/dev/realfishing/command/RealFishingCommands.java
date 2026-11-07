@@ -3,14 +3,17 @@ package dev.realfishing.command;
 import com.mojang.brigadier.CommandDispatcher;
 import dev.architectury.event.events.common.CommandRegistrationEvent;
 import dev.realfishing.RealFishing;
+import dev.realfishing.fishing.FishingManager;
 import dev.realfishing.platform.Platform;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
- * /realfishing 调试命令骨架。M0 只有 version；debug line/state/packets 按 SPEC §7 在后续里程碑填。
+ * /realfishing 调试命令：version、debug state、debug fight（跳过等漂直接进搏鱼，M4 接鱼表前调参用）。
  * 不负责：任何玩法逻辑，只做查询与调试开关。
  */
 public final class RealFishingCommands {
@@ -30,6 +33,28 @@ public final class RealFishingCommands {
                             "Real Fishing " + RealFishing.VERSION
                                     + " (" + Platform.get().loaderName() + ")"), false);
                     return 1;
-                })));
+                }))
+                .then(Commands.literal("debug")
+                        .then(Commands.literal("fight")
+                                .executes(context -> startFight(context.getSource(), context.getSource().getPlayerOrException(), 1))
+                                .then(Commands.argument("target", EntityArgument.player())
+                                        .executes(context -> startFight(context.getSource(),
+                                                EntityArgument.getPlayer(context, "target"), 1)))
+                                .then(Commands.literal("small").executes(context -> startFight(context.getSource(),
+                                        context.getSource().getPlayerOrException(), 0)))
+                                .then(Commands.literal("medium").executes(context -> startFight(context.getSource(),
+                                        context.getSource().getPlayerOrException(), 1)))
+                                .then(Commands.literal("big").executes(context -> startFight(context.getSource(),
+                                        context.getSource().getPlayerOrException(), 2))))));
+    }
+
+    private static int startFight(CommandSourceStack source, ServerPlayer player, int tier) {
+        boolean ok = FishingManager.debugStartFight(player, tier);
+        if (!ok) {
+            source.sendFailure(Component.literal("需要先抛竿并让浮漂落水"));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("debug fight started: tier=" + tier), false);
+        return 1;
     }
 }

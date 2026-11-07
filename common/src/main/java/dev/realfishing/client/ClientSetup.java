@@ -18,6 +18,7 @@ public final class ClientSetup {
         ClientGuiEvent.RENDER_HUD.register(FishingHud::render);
         ClientTickEvent.CLIENT_POST.register(ClientCast::clientTick);
         ClientTickEvent.CLIENT_POST.register(ClientLineSim::tick);
+        ClientFight.register();
         ClientTickEvent.CLIENT_POST.register(DebugAutoCast::tick);
     }
 }

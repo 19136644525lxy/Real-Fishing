@@ -151,6 +151,24 @@ public class BobberEntity extends Entity {
         }
     }
 
+    /** 咬钩/上鱼时在水面补一圈水花与声音（服务端调用，客户端也能用）。 */
+    public void splash() {
+        if (level().isClientSide) {
+            for (int i = 0; i < 10; i++) {
+                level().addParticle(ParticleTypes.SPLASH,
+                        getX() + (random.nextDouble() - 0.5) * 0.5,
+                        getY() + 0.05,
+                        getZ() + (random.nextDouble() - 0.5) * 0.5,
+                        0.0, 0.08, 0.0);
+            }
+        } else {
+            level().playSound(null, getX(), getY(), getZ(),
+                    SoundEvents.FISHING_BOBBER_SPLASH, SoundSource.NEUTRAL, 0.7F, 1.1F);
+            ((net.minecraft.server.level.ServerLevel) level()).sendParticles(
+                    ParticleTypes.SPLASH, getX(), getY() + 0.05, getZ(), 10, 0.2, 0.1, 0.2, 0.02);
+        }
+    }
+
     @Override
     protected void defineSynchedData() {
         this.entityData.define(DATA_OWNER, Optional.empty());
