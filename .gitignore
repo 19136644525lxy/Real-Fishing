@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+.gradlehome/
+build/
+*/build/
+build-log-*.txt
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# 运行目录
+run/
+run-server/
+
+# 系统
+Thumbs.db
+.DS_Store
+
+# 发布产物（本地构建生成，不入库）
+dist/

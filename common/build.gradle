@@ -1,0 +1,8 @@
+// common：玩法 / 物理 / 数据 / 网络定义。不允许出现 net.fabricmc.* 或 net.minecraftforge.*
+architectury {
+    common(rootProject.enabled_platforms.split(","))
+}
+
+dependencies {
+    modImplementation "dev.architectury:architectury:${rootProject.architectury_api_version}"
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "realfishing",
+  "version": "${version}",
+  "name": "Real Fishing",
+  "description": "写实钓鱼：纯 Java 物理的鱼线与搏鱼模型。",
+  "authors": [
+    "Real Fishing"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.realfishing.fabric.RealFishingFabric"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~1.20.1",
+    "java": ">=17",
+    "architectury": ">=9.2.14",
+    "fabric-api": "*"
+  }
+}

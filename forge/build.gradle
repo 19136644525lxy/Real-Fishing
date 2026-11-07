@@ -1,0 +1,91 @@
+// forge：入口 / 平台实现 / 事件订阅与 mixin
+plugins {
+    id "com.github.johnrengelman.shadow" version "7.1.2"
+}
+
+architectury {
+    platformSetupLoomIde()
+    forge()
+}
+
+// access widener 在 loom 闭包外解析：闭包里的 rootProject 可能被扩展属性遮蔽
+def awFile = project(":common").file("src/main/resources/${rootProject.property("archives_base_name")}.accesswidener")
+
+loom {
+    // 暂无 access widener（M0 不需要），文件出现后再接
+    if (awFile.exists()) {
+        accessWidenerPath = awFile
+    }
+
+    runs {
+        client {
+            client()
+            runDir "run"
+        }
+        server {
+            server()
+            runDir "run-server"
+        }
+    }
+}
+
+configurations {
+    common
+    shadowCommon
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+    developmentForge.extendsFrom common
+}
+
+dependencies {
+    forge "net.minecraftforge:forge:${rootProject.minecraft_version}-${rootProject.forge_version}"
+    modApi "dev.architectury:architectury-forge:${rootProject.architectury_api_version}"
+
+    common(project(path: ":common", configuration: "namedElements")) { transitive false }
+    shadowCommon(project(path: ":common", configuration: "transformProductionForge")) { transitive false }
+}
+
+// mods.toml 里的 ${file.jarVersion} 交给 Forge 在加载时替换，不要在这里 expand
+processResources {
+    inputs.property "version", project.version
+
+    // dev 环境下 Forge 会把 build/resources/main 当成资源包校验，缺 pack.mcmeta 会弹
+    // "Warning while loading mods" 界面挡住 quickPlay。生产 jar 由 shadowJar 合并 common，
+    // 这里只为 dev 资源目录补一份，shadowJar 里用 EXCLUDE 去重。
+    from(project(":common").file("src/main/resources/pack.mcmeta"))
+}
+
+shadowJar {
+    exclude "fabric.mod.json"
+    exclude "architectury.common.json"
+
+    // common 与 forge 资源目录都带 pack.mcmeta，合并时保留一份
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    configurations = [project.configurations.shadowCommon]
+    archiveClassifier = "dev-shadow"
+}
+
+remapJar {
+    input.set shadowJar.archiveFile
+    dependsOn shadowJar
+}
+
+sourcesJar {
+    def commonSources = project(":common").sourcesJar
+    dependsOn commonSources
+    from commonSources.archiveFile.map { zipTree(it) }
+}
+
+components.java {
+    withVariantsFromConfiguration(project.configurations.shadowRuntimeElements) {
+        skip()
+    }
+}
+
+// ${file.jarVersion} 依赖这个 manifest 属性
+jar {
+    manifest {
+        attributes("Implementation-Version": project.version)
+    }
+}

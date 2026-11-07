@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="realfishing"
+version="${file.jarVersion}"
+displayName="Real Fishing"
+authors="Real Fishing"
+description='''写实钓鱼：纯 Java 物理的鱼线与搏鱼模型。'''
+
+[[dependencies.realfishing]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.realfishing]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.realfishing]]
+modId="architectury"
+mandatory=true
+versionRange="[9.2.14,)"
+ordering="NONE"
+side="BOTH"

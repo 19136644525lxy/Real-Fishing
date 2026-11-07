@@ -1,0 +1,70 @@
+// 根构建脚本 —— 三层结构：common（纯玩法）/ fabric / forge
+// 版本号全部来自 gradle.properties（SPEC §7.1 冻结），不要在这里写死依赖版本。
+
+plugins {
+    id "architectury-plugin" version "3.4.164"
+    id "dev.architectury.loom" version "1.7.417" apply false
+}
+
+architectury {
+    minecraft = rootProject.minecraft_version
+}
+
+subprojects {
+    // loom 在 apply 时按项目属性 loom.platform 决定是否创建 forge 依赖配置；
+    // architectury 的 forge() 之后才调用，来不及，所以必须在 apply loom 之前设好。
+    if (project.name == "forge") {
+        project.ext["loom.platform"] = "forge"
+    }
+
+    apply plugin: "dev.architectury.loom"
+    apply plugin: "java"
+    apply plugin: "architectury-plugin"
+
+    // 官方 Mojang 映射：不下载许可对话框（SPEC D7）
+    loom {
+        silentMojangMappingsLicense()
+    }
+
+    repositories {
+        mavenCentral()
+        maven { url "https://maven.architectury.dev/" }
+        maven { url "https://maven.fabricmc.net/" }
+        maven { url "https://maven.minecraftforge.net/" }
+    }
+
+    dependencies {
+        minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+        mappings loom.officialMojangMappings()
+
+        testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+        testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
+    }
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(rootProject.java_version as int)
+        }
+        withSourcesJar()
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = "UTF-8"
+        options.release = 17
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+    }
+}
+
+allprojects {
+    version = rootProject.mod_version
+    group = rootProject.maven_group
+}
+
+subprojects {
+    base {
+        archivesName = "${rootProject.archives_base_name}-${project.name}"
+    }
+}
