@@ -19,14 +19,14 @@
 
 ## M1 · 抛投（5 人日）
 
-- [ ] `FishingState` 枚举 + `FishingSession` + 服务端 `SavedData`（0.5）
-- [ ] `RodItem` 基类 + `RodStyle` 枚举 + `FloatRodItem` 的 `use` / `releaseUsing` 接蓄力（0.6）
-- [ ] `CastC2S` 包 + 服务端校验（距离/速率）（0.5）
-- [ ] `BobberEntity`：物理（重力/阻力/风）、入水检测、splash（1.0）
-- [ ] 客户端预测浮漂 + 与服务端平滑合并（1.0）
-- [ ] 蓄力 HUD 力度条（0.5）
-- [ ] 状态机 IDLE→CHARGING→CASTING→WAITING 全链路（1.0）
-- [ ] **DoD**：AC-2 达成（8–24 格，误差 ≤1.5 格）
+- [x] `FishingState` 枚举 + `FishingSession` + 服务端 `SavedData`（0.5）
+- [x] `RodItem` 基类 + `RodStyle` 枚举 + `FloatRodItem` 的 `use` / `releaseUsing` 接蓄力（0.6）
+- [x] `CastC2S` 包 + 服务端校验（距离/速率）（0.5）
+- [x] `BobberEntity`：物理（重力/阻力/风）、入水检测、splash（1.0）
+- [x] 客户端预测浮漂 + 与服务端平滑合并（1.0）
+- [x] 蓄力 HUD 力度条（0.5）
+- [x] 状态机 IDLE→CHARGING→CASTING→WAITING 全链路（1.0）
+- [x] **DoD**：AC-2 达成（8–24 格，误差 ≤1.5 格；`CastMathTest` + 自动抛投实测 charge=0.25 → 9.07 格）
 
 ## M2 · 鱼线（6 人日）
 

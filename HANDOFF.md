@@ -7,10 +7,10 @@
 
 ## 1. 一句话现状
 
-**M0 骨架已完成，双端 `runClient` 进世界 + `runServer` 起服全部验证通过；下一步 M1 抛投。**
+**M0 骨架 + M1 抛投已完成，Fabric 端已实测蓄力→抛投→入水→WAITING 全链路；下一步 M2 鱼线。**
 
 - 目标：Minecraft 1.20.1 写实钓鱼模组，Fabric + Forge 双端，Architectury 三层，纯 Java 物理。
-- 进度：M0 已勾选完成（`ROADMAP.md`）；M1–M6（v0.1 台钓竿）待开工；M9（v0.2 路亚竿）只有规格。
+- 进度：M0、M1 已勾选完成（`ROADMAP.md`）；M2–M6（v0.1 台钓竿）待开工；M9（v0.2 路亚竿）只有规格。
 - 已冻结的决策、参数、协议、里程碑全部写在 SPEC，**不要重新讨论，直接照做**。
 - 构建/验证命令见 AGENTS §3；`GRADLE_USER_HOME=F:\.gradlecache`，JDK 17。
 
@@ -35,11 +35,11 @@
 | `gradle.properties` | 版本锁定（SPEC §7.1）：MC 1.20.1 / Architectury 9.2.14 / Loom 1.7.417 / Forge 47.3.33 | ✅ |
 | `settings.gradle` / `build.gradle` | 三模块工程 + 统一 toolchain 17 / JUnit 5 | ✅ |
 | `gradlew` / `gradle/wrapper` | Gradle 8.8 wrapper（`validateDistributionUrl=false`） | ✅ |
-| `common/` | 玩法/物理/数据层（无平台 import）：`RealFishing`、`IPlatform`、`ModItems`、`ModEntities`、`RodItem`、`FloatRodItem`、`BobberEntity`、`RealFishingCommands` | ✅ M0 |
+| `common/` | 玩法/物理/数据层（无平台 import）：`RealFishing`、`IPlatform`、`ModItems`、`ModEntities`、`RodItem`、`FloatRodItem`、`BobberEntity`、`RealFishingCommands`；M1 新增 `fishing/`（`FishingState`/`FishingSession`/`CastMath`/`FishingManager`）、`data/FishingSavedData`、`net/CastC2S`、`client/`（`BobberRenderer`/`FishingHud`/`ClientCast`/`ClientSetup`/`DebugAutoCast`） | ✅ M0/M1 |
 | `fabric/` / `forge/` | 平台实现：入口类 + `*Platform` + 资源/元数据 | ✅ M0 |
-| `build-tools/rcon.js` | 开发期 RCON 客户端（`node build-tools/rcon.js <pass> <cmd...>`），**不随模组发布** | 🔧 工具 |
+| `build-tools/rcon.js` | 开发期 RCON 客户端（`node build-tools/rcon.js <pass> <cmd...>`），**不随模组发布** | 🔧 工具 |\n| `common/.../client/DebugAutoCast` | 开发期自动抛投：设 `REALFISHING_AUTOCAST=1` 后进世界自动塞竿、蓄力、松手，用于无输入环境冒烟测试 | 🔧 工具 |
 
-**没有的东西**：M1 及以后的玩法代码（`FishingSession`、`FishingLine`、`FightModel`、网络包、HUD/渲染）、音效、鱼表数据。M0 的 `FloatRodItem.use` 只在右键时打一行日志。
+**没有的东西**：M2 及以后的玩法代码（`FishingLine` Verlet 鱼线、`FightModel` 搏鱼、鱼表、音效、S2C 会话同步）。M1 只有 C2S 的 `CastC2S`；HUD 只有蓄力条，没有张力/鱼讯。
 
 ---
 
@@ -129,7 +129,7 @@ cd F:\RealisticFishing
 
 ---
 
-## 5. 已解决的未知项 & M0 踩坑（务必先看）
+## 5. 已解决的未知项 & M0/M1 踩坑（务必先看）
 
 **三个未知项现状：**
 
@@ -146,7 +146,7 @@ cd F:\RealisticFishing
 | Forge 客户端弹 "Warning while loading mods" 挡住 quickPlay | dev 的 `forge/build/resources/main` 被当资源包校验，缺 `pack.mcmeta` | `forge/build.gradle` 的 `processResources` 从 `common/src/main/resources/pack.mcmeta` 复制一份；`shadowJar` 设 `duplicatesStrategy = EXCLUDE` |
 | 日志 `No data fixer registered for realfishing:bobber` | 1.20.1 `EntityType.Builder.build(String)` 在 `serialize=true` 时会查 datafixer 表 | 浮漂 builder 加 `.noSave()`（它本来就不该落盘） |
 | javac 报非法字符 / 中文注释变乱码 | PowerShell `Set-Content -Encoding utf8` 写 BOM；`Get-Content\|Set-Content` 走 GBK 转码 | 写文件用 `New-Object Text.UTF8Encoding($false)`；改代码用编辑工具而不是 PS 管道 |
-| 控制台 `��ʼ����` | Windows 控制台代码页，不是代码问题 | 忽略；`run/logs/latest.log` 里是正常 UTF-8 |
+| 控制台 `��ʼ����` | Windows 控制台代码页，不是代码问题 | 忽略；`run/logs/latest.log` 里是正常 UTF-8 |\n| 自动抛投时 `/give` 没生效，手里还是 air | 单人存档没开作弊，客户端发的命令被拒 | `DebugAutoCast` 改为 `client.getSingleplayerServer().execute(...)` 直接塞 0 号快捷栏 |\n| 自动化跑客户端时 release → cast 隔了 13 秒 | 单人游戏窗口失焦会暂停，服务端 tick 停摆 | 自动化前先让窗口获得焦点；日志时间戳不能当真实延迟看 |
 
 **调试入口**：`build-tools/rcon.js`（Node 写的极简 RCON 客户端，改 `forge/run-server/server.properties` 开 `enable-rcon` 后用 `node build-tools/rcon.js <pass> <cmd...>`）。`/realfishing version` 已验证返回 `Real Fishing 0.1.0 (forge)`，`summon realfishing:bobber` 也能生成实体。
 
@@ -176,7 +176,7 @@ cd F:\RealisticFishing
 - [x] 两张 32×32 图标已知落位路径（上面 §3.2）；
 - [x] 知道 v0.1 只做 `float_rod`，`lure_rod` 是 M9；
 - [x] 知道 mixin 上限 8，且新增必须登记 `docs/mixins.md`；
-- [x] M0 已验证：`common` 无平台 import、双端进世界、`/realfishing version` 与浮漂实体可用。
+- [x] M0 已验证：`common` 无平台 import、双端进世界、`/realfishing version` 与浮漂实体可用。\n- [x] M1 已验证：`CastMathTest` 覆盖 AC-2 射程；Fabric 端 `REALFISHING_AUTOCAST=1` 实测 `cast accepted → landed line=9.07`（charge=0.25）。\n- [ ] M1 待人工确认：蓄力条与浮漂贴图的**视觉效果**（自动化环境无法截图）。
 
 ---
 
@@ -188,4 +188,4 @@ cd F:\RealisticFishing
 
 ---
 
-*本文件随项目演进更新；最后更新：M0 骨架完成（2026-11-07）。*
+*本文件随项目演进更新；最后更新：M1 抛投完成（2026-11-07）。*
