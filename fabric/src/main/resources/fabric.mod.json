@@ -12,6 +12,9 @@
   "entrypoints": {
     "main": [
       "dev.realfishing.fabric.RealFishingFabric"
+    ],
+    "client": [
+      "dev.realfishing.fabric.client.FabricWorldRender"
     ]
   },
   "depends": {

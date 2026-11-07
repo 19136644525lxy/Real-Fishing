@@ -35,11 +35,29 @@ M1 以验收标准为准，改用"每秒"量纲并由 `CastMath` 固定 80 Hz �
 | `cast.chargeTicks` | 40（2 s 满蓄力） | 与 `getUseDuration` 一致 |
 | 实测射程 | charge=0 → 8.0 格；charge=1 → 23.6 格 | Node 弹道模拟 + 单测双确认 |
 
+## 鱼线的实现值（M2）
+
+SPEC §10 给的是"每 tick"量纲，FishingLine 内部统一换算成"每秒"并由 60 Hz 子步积分：
+
+| 参数 | 值 | 备注 |
+|---|---|---|
+| line.nodes | 24 | 23 段，段长 = 线长/23 |
+| line.dt | 1/60 s | 每 tick 最多 3 个子步（MAX_SUBSTEPS=4） |
+| line.gravity | 20.0 格/s² | = 0.05 格/tick²，视觉上比实体更"飘" |
+| line.airDrag | 0.002 /s | 线很轻，几乎只受重力 |
+| line.waterDrag | 0.02 /s | 水面以下节点额外阻尼 |
+| line.buoyancy | 2.0 格/s² | 水面以下节点上浮，避免整根线沉底 |
+| line.maxStrain | 0.12 | 拉伸 12% 记满张力 |
+| line.breakHold | 0.25 s | 满张力持续这么久才断 |
+| line.iterations | 10（上限 40） | 每次 relax 后若 maxStrain ≤ 0.01 提前收敛 |
+| 渲染 | Catmull-Rom ×2 细分（47 点），四边形带宽 0.022 | 不用 RenderType.lines() |
+
 ## 变更日志
 
 | 日期 | 参数 | 旧 → 新 | 原因 | 评分 | 备注 |
 |---|---|---|---|---|---|
 | 2026-11-07 | `cast.gravity` / `cast.airDrag` | — → 6.0 / 0.02 | 按 AC-2 反推，SPEC §12 的 tick 量纲无法满足 8–24 格 | — | 待 M3 手感实测后复核 |
+| 2026-11-07 | `line.iterations` | 固定 10 → 自适应（≤40，maxStrain≤0.01 停） | 固定 10 次在绷紧时会把 10 格线拉长 7%，单测直接失败 | — | 长跑 25k tick 稳定 |
 | — | — | — | 基线建立 | — | 待 M3 首次实测 |
 
 ## 调参方法

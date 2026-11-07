@@ -18,13 +18,19 @@ import net.minecraft.world.level.Level;
  * 不负责：浮漂物理（BobberEntity）、会话状态（FishingManager）、HUD（client 包）。
  */
 public class FloatRodItem extends RodItem {
+    /**
+     * 弓式长时长：如果返回 40，物品使用会在蓄满的同一 tick 自然结束，
+     * 玩家松手时 releaseUsing 根本不触发（这也是蓄力条卡住、抛不出去的原因）。
+     */
+    private static final int USE_DURATION = 72000;
+
     public FloatRodItem() {
         super(RodStyle.FLOAT, new Properties().stacksTo(1).durability(64));
     }
 
     @Override
     public int getUseDuration(ItemStack stack) {
-        return CastMath.CHARGE_TICKS;
+        return USE_DURATION;
     }
 
     @Override
@@ -42,12 +48,14 @@ public class FloatRodItem extends RodItem {
         if (!(entity instanceof Player player)) {
             return;
         }
-        int used = getUseDuration(stack) - timeLeft;
+        int used = Math.min(player.getTicksUsingItem(), CastMath.CHARGE_TICKS);
         float charge = Mth.clamp(used / (float) CastMath.CHARGE_TICKS, 0.0F, 1.0F);
         if (charge < CastMath.MIN_CHARGE) {
             return;
         }
         if (level.isClientSide) {
+            // 先摆一下手臂，至少让"抛"这个动作在第三人称里有反馈（正式动画见 M5）。
+            player.swing(InteractionHand.MAIN_HAND, true);
             new CastC2S(charge, player.getYRot(), player.getXRot()).sendToServer();
             ClientCast.spawnPrediction(player, charge);
         }

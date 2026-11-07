@@ -27,12 +27,13 @@ public final class FishingHud {
             return;
         }
         ItemStack stack = player.getUseItem();
-        if (!(stack.getItem() instanceof FloatRodItem rod)) {
+        if (!(stack.getItem() instanceof FloatRodItem)) {
             return;
         }
-        int duration = rod.getUseDuration(stack);
-        int remaining = player.getUseItemRemainingTicks();
-        float charge = Mth.clamp((duration - remaining) / (float) CastMath.CHARGE_TICKS, 0.0F, 1.0F);
+        // 蓄力以"已经用了多少 tick"计，而不是剩余 tick：竿的 UseDuration 是弓式长时长，
+        // 用剩余 tick 会在按住的第一帧就显示满格。
+        int used = Math.min(player.getTicksUsingItem(), CastMath.CHARGE_TICKS);
+        float charge = Mth.clamp(used / (float) CastMath.CHARGE_TICKS, 0.0F, 1.0F);
 
         int x = (graphics.guiWidth() - WIDTH) / 2;
         int y = graphics.guiHeight() / 2 + 22;

@@ -17,6 +17,7 @@ public final class ClientSetup {
         EntityRendererRegistry.register(ModEntities.BOBBER, BobberRenderer::new);
         ClientGuiEvent.RENDER_HUD.register(FishingHud::render);
         ClientTickEvent.CLIENT_POST.register(ClientCast::clientTick);
+        ClientTickEvent.CLIENT_POST.register(ClientLineSim::tick);
         ClientTickEvent.CLIENT_POST.register(DebugAutoCast::tick);
     }
 }

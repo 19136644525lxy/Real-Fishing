@@ -39,6 +39,17 @@ public class BobberEntity extends Entity {
     private boolean landed;
     private int landedTicks;
 
+    /** 仅客户端：本地预测生成的替身，服务器实体到达并落定后由 ClientCast 丢弃。不同步。 */
+    private boolean predicted;
+
+    public boolean isPredicted() {
+        return predicted;
+    }
+
+    public void setPredicted(boolean predicted) {
+        this.predicted = predicted;
+    }
+
     public BobberEntity(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = false;
@@ -110,9 +121,15 @@ public class BobberEntity extends Entity {
         if (isInWaterState()) {
             // 贴到水面，避免半个漂沉在水里
             BlockPos pos = blockPosition();
+            // 水域可能是多层：向上找到最上层的水方块，否则浮漂会停在第二层水里被水面盖住。
+            int guard = 0;
+            while (guard++ < 8 && !level().getFluidState(pos.above()).isEmpty()) {
+                pos = pos.above();
+            }
             FluidState fluid = level().getFluidState(pos);
             double surface = pos.getY() + fluid.getHeight(level(), pos);
-            setPos(getX(), surface - 0.05, getZ());
+            // 浮漂要露出水面：贴到水面之上一点点，否则会被半透明水面挡掉（看起来"入水即消失"）。
+            setPos(getX(), surface + 0.30, getZ());
             if (level().isClientSide) {
                 for (int i = 0; i < 8; i++) {
                     level().addParticle(ParticleTypes.SPLASH,

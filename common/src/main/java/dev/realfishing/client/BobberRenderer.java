@@ -21,8 +21,8 @@ import org.joml.Matrix4f;
 public class BobberRenderer extends EntityRenderer<BobberEntity> {
     private static final ResourceLocation TEXTURE =
             new ResourceLocation(RealFishing.MOD_ID, "textures/entity/bobber.png");
-    private static final float HALF_WIDTH = 0.09F;
-    private static final float HALF_HEIGHT = 0.13F;
+    private static final float HALF_WIDTH = 0.16F;
+    private static final float HALF_HEIGHT = 0.22F;
 
     public BobberRenderer(EntityRendererProvider.Context context) {
         super(context);

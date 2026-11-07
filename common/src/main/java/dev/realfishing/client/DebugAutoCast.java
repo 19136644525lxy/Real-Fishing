@@ -3,6 +3,7 @@ package dev.realfishing.client;
 import dev.realfishing.RealFishing;
 import dev.realfishing.registry.ModItems;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 
@@ -51,6 +52,9 @@ final class DebugAutoCast {
             }
             case 1 -> {
                 if (age > 60) {
+                    // 必须同时把"使用键"按住：Minecraft.handleKeybinds 每 tick 检查鼠标右键，
+                    // 键没按下时会立刻 releaseUsingItem，导致蓄力永远是 0 tick。
+                    client.options.keyUse.setDown(true);
                     client.gameMode.useItem(client.player, InteractionHand.MAIN_HAND);
                     RealFishing.LOGGER.info("[M1] autocast: using rod, item={}", client.player.getMainHandItem());
                     stage = 2;
@@ -58,13 +62,53 @@ final class DebugAutoCast {
             }
             case 2 -> {
                 if (age > 100) {
-                    client.gameMode.releaseUsingItem(client.player);
+                    // 蓄满 40 tick（约 0.45 → 1.0 蓄力），验证满格也能正常松手抛出。
+                    client.options.keyUse.setDown(false);
                     RealFishing.LOGGER.info("[M1] autocast: released");
                     stage = 3;
+                }
+            }
+            case 3 -> {
+                if (age > 116) {
+                    shot(client, "autocast-flight.png");
+                    stage = 4;
+                }
+            }
+            case 4 -> {
+                if (age > 180) {
+                    shot(client, "autocast-landed.png");
+                    stage = 5;
                 }
             }
             default -> {
             }
         }
+    }
+
+    /** 没有外部截图能力时的自检：让游戏自己把画面存到 screenshots/。 */
+    private static void shot(Minecraft client, String name) {
+        if (!"1".equals(System.getenv("REALFISHING_SHOT"))) {
+            return;
+        }
+        var line = ClientLineSim.line();
+        if (client.level != null && client.player != null) {
+            for (var b : client.level.getEntitiesOfClass(dev.realfishing.entity.BobberEntity.class,
+                    client.player.getBoundingBox().inflate(40.0))) {
+                RealFishing.LOGGER.info("[M2] bobber entity id={} pos={} predicted={} landed={} visible={}",
+                        b.getId(), b.position(), b.isPredicted(), b.isLanded(), !b.isInvisible());
+            }
+        }
+        if (line != null) {
+            var cam = client.gameRenderer.getMainCamera();
+            RealFishing.LOGGER.info("[M2] shot {} cam={} look={} node0=({},{},{}) node23=({},{},{})",
+                    name, cam.getPosition(), new net.minecraft.world.phys.Vec3(cam.getLookVector()),
+                    line.nodeX(0), line.nodeY(0), line.nodeZ(0),
+                    line.nodeX(dev.realfishing.physics.FishingLine.NODES - 1),
+                    line.nodeY(dev.realfishing.physics.FishingLine.NODES - 1),
+                    line.nodeZ(dev.realfishing.physics.FishingLine.NODES - 1));
+        }
+        Screenshot.grab(client.gameDirectory, name, client.getMainRenderTarget(), message -> {
+        });
+        RealFishing.LOGGER.info("[M1] autocast: screenshot {}", name);
     }
 }

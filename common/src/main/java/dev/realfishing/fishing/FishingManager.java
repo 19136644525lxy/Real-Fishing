@@ -50,9 +50,13 @@ public final class FishingManager {
             return;
         }
         if (session.state == FishingState.WAITING || session.state == FishingState.CASTING) {
-            // 再按右键＝收竿（M1 的"收回"路径，M3 再换成真正的收线）
+            // 再按右键：先把上一竿收回来，然后同一按继续蓄力——
+            // 否则玩家会以为"按了没反应"（只能收竿、不能接着抛）。
             cleanup(player, session, now);
-            return;
+            session = data.get(player.getUUID());
+            if (session == null) {
+                return;
+            }
         }
         session.transition(FishingState.CHARGING, now);
         session.charge = 0.0F;
@@ -66,6 +70,8 @@ public final class FishingManager {
         long now = gameTime(player.server);
         FishingSession session = data.get(player.getUUID());
         if (session == null || session.state != FishingState.CHARGING) {
+            RealFishing.LOGGER.info("[M1] cast rejected: session={} state={}",
+                    session != null, session == null ? null : session.state);
             return;
         }
         if (!holdingRod(player)) {

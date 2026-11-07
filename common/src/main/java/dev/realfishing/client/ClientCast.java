@@ -31,6 +31,7 @@ public final class ClientCast {
         }
         Vec3 dir = CastMath.direction(player.getYRot(), player.getXRot());
         BobberEntity bobber = new BobberEntity(ModEntities.BOBBER.get(), level);
+        bobber.setPredicted(true);
         bobber.setOwner(player.getUUID());
         Vec3 start = player.getEyePosition().add(dir.scale(0.4));
         bobber.moveTo(start.x, start.y, start.z, player.getYRot(), player.getXRot());
@@ -41,6 +42,12 @@ public final class ClientCast {
         if (old != null) {
             old.discard();
         }
+    }
+
+    /** 该玩家是否正有一只本地预测的替身浮漂在飞（渲染器据此隐藏服务器实体，避免双漂/回跳）。 */
+    public static boolean hasPrediction(UUID owner) {
+        BobberEntity ghost = PREDICTED.get(owner);
+        return ghost != null && !ghost.isRemoved();
     }
 
     public static void clientTick(Minecraft minecraft) {
@@ -57,12 +64,14 @@ public final class ClientCast {
             }
             List<BobberEntity> authoritative = minecraft.level.getEntitiesOfClass(
                     BobberEntity.class,
-                    ghost.getBoundingBox().inflate(4.0),
+                    ghost.getBoundingBox().inflate(6.0),
                     other -> other != ghost && other.owner().map(entry.getKey()::equals).orElse(false));
-            if (!authoritative.isEmpty()) {
+            // 服务器实体到达后最多再让替身领先 5 tick：替换瞬间两者位置差很小，
+            // 又不会出现"两个浮漂并排"的画面。
+            if (!authoritative.isEmpty() && ghost.tickCount > 5) {
                 ghost.discard();
                 iterator.remove();
-            }
+                }
         }
     }
 }

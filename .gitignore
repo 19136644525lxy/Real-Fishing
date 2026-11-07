@@ -26,3 +26,5 @@ Thumbs.db
 dist/
 
 common/logs/
+art/
+docs/

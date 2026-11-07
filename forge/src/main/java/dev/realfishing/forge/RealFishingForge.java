@@ -2,8 +2,11 @@ package dev.realfishing.forge;
 
 import dev.architectury.platform.forge.EventBuses;
 import dev.realfishing.RealFishing;
+import dev.realfishing.forge.client.ForgeWorldRender;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 
 /**
  * Forge 入口：构造期注入平台实现并触发公共注册（Forge 在 mod 构造时注册内容）。
@@ -18,5 +21,8 @@ public final class RealFishingForge {
         EventBuses.registerModEventBus(RealFishing.MOD_ID, context.getModEventBus());
         RealFishing.init(new ForgePlatform());
         RealFishing.register();
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            ForgeWorldRender.register();
+        }
     }
 }
